@@ -6,23 +6,36 @@ import (
 	"github.com/al-pi314/gogo/game"
 	"github.com/al-pi314/gogo/player"
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/spf13/viper"
 )
 
+func loadConfig() {
+	viper.SetEnvPrefix("X")
+	viper.SetConfigFile(".env")
+	viper.ReadInConfig()
+}
+
 func main() {
+	loadConfig()
+	squareSize := viper.GetInt("SQUARE_SIZE")
+	borderSize := viper.GetInt("BORDER_SIZE")
+	rows := viper.GetInt("ROWS")
+	columns := viper.GetInt("COLUMNS")
+
 	whitePlayer := player.NewHuman(player.Human{
-		XSnap: 33,
-		YSnap: 33,
+		XSnap: squareSize + borderSize,
+		YSnap: squareSize + borderSize,
 	})
 	blackPlayer := player.NewHuman(player.Human{
-		XSnap: 33,
-		YSnap: 33,
+		XSnap: squareSize + borderSize,
+		YSnap: squareSize + borderSize,
 	})
 
 	game := game.NewGame(game.Game{
-		Rows:        19,
-		Columns:     19,
-		SquareSize:  30,
-		BorderSize:  3,
+		Rows:        rows,
+		Columns:     columns,
+		SquareSize:  squareSize,
+		BorderSize:  borderSize,
 		WhitePlayer: whitePlayer,
 		BlackPlayer: blackPlayer,
 	})

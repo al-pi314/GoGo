@@ -2,4 +2,5 @@
 .vscode
 
 # builds
+.env
 *.exe

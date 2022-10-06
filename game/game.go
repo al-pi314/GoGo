@@ -228,7 +228,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 			if !*piece {
 				clr = color.Black
 			}
-			ebitenutil.DrawCircle(screen, float64(x), float64(y), 12, clr)
+			ebitenutil.DrawCircle(screen, float64(x), float64(y), float64(g.SquareSize/2)*0.8, clr)
 		}
 
 	}
