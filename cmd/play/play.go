@@ -3,22 +3,29 @@ package main
 import (
 	"log"
 
-	"github.com/al-pi314/GoGo/game"
+	"github.com/al-pi314/gogo/game"
+	"github.com/al-pi314/gogo/player"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
 func main() {
-	game := game.NewGame(game.Game{
-		Rows:       19,
-		Columns:    19,
-		SquareSize: 30,
-		BorderSize: 3,
+	whitePlayer := player.NewHuman(player.Human{
+		XSnap: 33,
+		YSnap: 33,
+	})
+	blackPlayer := player.NewHuman(player.Human{
+		XSnap: 33,
+		YSnap: 33,
 	})
 
-	game.PlacePiece(0, 0, true)
-	game.PlacePiece(8, 7, true)
-	game.PlacePiece(7, 8, false)
-	game.PlacePiece(18, 18, false)
+	game := game.NewGame(game.Game{
+		Rows:        19,
+		Columns:     19,
+		SquareSize:  30,
+		BorderSize:  3,
+		WhitePlayer: whitePlayer,
+		BlackPlayer: blackPlayer,
+	})
 
 	ebiten.SetWindowSize(game.Size())
 	ebiten.SetWindowTitle("GoGo")

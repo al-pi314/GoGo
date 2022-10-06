@@ -1,4 +1,4 @@
-module github.com/al-pi314/GoGo
+module github.com/al-pi314/gogo
 
 go 1.17
 

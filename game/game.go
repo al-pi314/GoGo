@@ -3,6 +3,7 @@ package game
 import (
 	"image/color"
 
+	"github.com/al-pi314/gogo/player"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 )
@@ -13,11 +14,17 @@ type Cordinate struct {
 }
 
 type Game struct {
-	Rows       int
-	Columns    int
-	SquareSize int
-	BorderSize int
-	board      [][]*bool
+	Rows        int
+	Columns     int
+	SquareSize  int
+	BorderSize  int
+	WhitePlayer player.Player
+	BlackPlayer player.Player
+
+	board       [][]*bool
+	delay_lock  bool
+	locked      Cordinate
+	whiteToMove bool
 }
 
 func NewGame(g Game) *Game {
@@ -25,6 +32,7 @@ func NewGame(g Game) *Game {
 	for y := range g.board {
 		g.board[y] = make([]*bool, g.Columns)
 	}
+	g.locked = Cordinate{-1, -1}
 
 	return &g
 }
@@ -43,14 +51,21 @@ func (g *Game) drawSquare(screen *ebiten.Image, x1, y1, x2, y2 int, clr color.Co
 	}
 }
 
-func (g *Game) hasRoom(x, y int, white bool, checked map[Cordinate]bool) bool {
+func (g *Game) pieceAt(x, y int) *bool {
+	if y >= len(g.board) || y < 0 || x >= len(g.board[y]) || x < 0 {
+		return nil
+	}
+	return g.board[y][x]
+}
+
+func (g *Game) hasRoom(x, y int, white bool, checked map[Cordinate]bool, group *[]Cordinate) bool {
 	c := Cordinate{x, y}
 	if checked, ok := checked[c]; ok && checked {
 		return false
 	}
 	checked[c] = true
 
-	if y >= len(g.board) || x >= len(g.board[y]) {
+	if y >= len(g.board) || y < 0 || x >= len(g.board[y]) || x < 0 {
 		return false
 	}
 
@@ -62,36 +77,112 @@ func (g *Game) hasRoom(x, y int, white bool, checked map[Cordinate]bool) bool {
 		return false
 	}
 
-	return g.hasRoom(x-1, y, white, checked) || g.hasRoom(x+1, y, white, checked) || g.hasRoom(x, y-1, white, checked) || g.hasRoom(x, y+1, white, checked)
+	// record group
+	if group != nil {
+		*group = append(*group, c)
+	}
+
+	// execute all checks
+	results := []bool{g.hasRoom(x-1, y, white, checked, group), g.hasRoom(x+1, y, white, checked, group), g.hasRoom(x, y-1, white, checked, group), g.hasRoom(x, y+1, white, checked, group)}
+	for _, r := range results {
+		if r {
+			return true
+		}
+	}
+	return false
 }
 
 // ------------------------------------ ----------------- ------------------------------------ \\
 
 // -------------------------------------- Game Functions ------------------------------------- \\
-func (g *Game) PlacePiece(x, y int, white bool) bool {
+func (g *Game) placePiece(x, y int, white bool) bool {
 	// out of bounds or already occupied spaces are invalid
-	if y >= len(g.board) || x >= len(g.board[y]) || g.board[y][x] != nil {
+	if y >= len(g.board) || y < 0 || x >= len(g.board[y]) || x < 0 || g.board[y][x] != nil {
 		return false
 	}
-
-	// would be eliminated when placed
-	if !g.hasRoom(x, y, white, map[Cordinate]bool{}) {
-		return false
-	}
-
 	// place piece
 	g.board[y][x] = &white
 
-	// check if it eliminates any oponents pieces
+	// check for opponent group eliminations
+	if g.caputreOpponent(x, y, white) {
+		return true
+	}
+
+	// would be eliminated when placed
+	hasRoom := g.hasRoom(x, y, white, map[Cordinate]bool{}, nil)
+	if !hasRoom {
+		g.board[y][x] = nil
+		return false
+	}
 
 	return true
+}
+
+func (g *Game) caputreOpponent(x, y int, white bool) bool {
+	toRemove := []Cordinate{}
+	if g := g.findGroup(x-1, y, !white); g != nil {
+		toRemove = append(toRemove, g...)
+	}
+	if g := g.findGroup(x+1, y, !white); g != nil {
+		toRemove = append(toRemove, g...)
+	}
+	if g := g.findGroup(x, y-1, !white); g != nil {
+		toRemove = append(toRemove, g...)
+	}
+	if g := g.findGroup(x, y+1, !white); g != nil {
+		toRemove = append(toRemove, g...)
+	}
+
+	// ko rule
+	if len(toRemove) == 1 {
+		if toRemove[0].X == g.locked.X && toRemove[0].Y == g.locked.Y {
+			return false
+		}
+		g.delay_lock = true
+		g.locked.X = x
+		g.locked.Y = y
+	}
+
+	for _, c := range toRemove {
+		g.board[c.Y][c.X] = nil
+	}
+	return len(toRemove) != 0
+}
+
+func (g *Game) findGroup(x, y int, white bool) []Cordinate {
+	pieceColor := g.pieceAt(x, y)
+	if pieceColor == nil || *pieceColor != white {
+		return nil
+	}
+
+	group := []Cordinate{}
+	if g.hasRoom(x, y, white, map[Cordinate]bool{}, &group) {
+		return nil
+	}
+
+	return group
 }
 
 // -------------------------------------- -------------- ------------------------------------- \\
 
 // --------------------------- Functions required by ebiten engine --------------------------- \\
 func (g *Game) Update() error {
-	// Write your game's logical update.
+	player := g.WhitePlayer
+	if !g.whiteToMove {
+		player = g.BlackPlayer
+	}
+
+	place, x, y, skip := player.Place(g.board)
+	if place && (skip || g.placePiece(x, y, g.whiteToMove)) {
+		// lock unlocks after next successful move
+		if !g.delay_lock {
+			g.locked.X = -1
+			g.locked.Y = -1
+		}
+		g.delay_lock = false
+		// change player to move
+		g.whiteToMove = !g.whiteToMove
+	}
 	return nil
 }
 
@@ -131,8 +222,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 			if piece == nil {
 				continue
 			}
-			x := (piece_y+1)*(g.SquareSize+g.BorderSize) - g.SquareSize/2
-			y := (piece_x+1)*(g.SquareSize+g.BorderSize) - g.SquareSize/2
+			x := (piece_x+1)*(g.SquareSize+g.BorderSize) - g.SquareSize/2
+			y := (piece_y+1)*(g.SquareSize+g.BorderSize) - g.SquareSize/2
 			clr := color.White
 			if !*piece {
 				clr = color.Black
