@@ -27,6 +27,7 @@ func main() {
 		BlackPlayer: blackPlayer,
 	})
 
+	ebiten.SetTPS(ebiten.SyncWithFPS)
 	ebiten.SetWindowSize(game.Size())
 	ebiten.SetWindowTitle("GoGo")
 

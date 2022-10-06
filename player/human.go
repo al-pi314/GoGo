@@ -15,7 +15,7 @@ func NewHuman(p Human) Player {
 }
 
 func (p *Human) Place(board [][]*bool) (bool, int, int, bool) {
-	if ebiten.IsFocused() && inpututil.IsMouseButtonJustReleased(ebiten.MouseButtonLeft) {
+	if ebiten.IsFocused() && inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
 		x, y := ebiten.CursorPosition()
 		return true, x / p.XSnap, y / p.YSnap, false
 	}
