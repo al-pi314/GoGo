@@ -258,8 +258,8 @@ func (g *Game) Update() error {
 		player = g.BlackPlayer
 	}
 
-	place, x, y, skip := player.Place(g.board)
-	if skip || (place && g.placePiece(x, y, g.whiteToMove)) {
+	skip, x, y := player.Place(g.board)
+	if skip || ((x != nil && y != nil) && g.placePiece(*x, *y, g.whiteToMove)) {
 		// consequitive skips end the game
 		if skip && g.did_skip {
 			g.active = false

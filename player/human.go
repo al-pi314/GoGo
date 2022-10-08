@@ -15,15 +15,17 @@ func NewHuman(p Human) Player {
 }
 
 // Place implements player logic for placing their piece. Returns wether to place the piece or not, piece position and weather to skip move.
-func (p *Human) Place(board [][]*bool) (bool, int, int, bool) {
+func (p *Human) Place(board [][]*bool) (bool, *int, *int) {
 	if ebiten.IsFocused() {
 		switch {
 		case inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft):
 			x, y := ebiten.CursorPosition()
-			return true, x / p.XSnap, y / p.YSnap, false
+			x /= p.XSnap
+			y /= p.YSnap
+			return false, &x, &y
 		case inpututil.IsKeyJustPressed(ebiten.KeySpace):
-			return false, -1, -1, true
+			return true, nil, nil
 		}
 	}
-	return false, -1, -1, false
+	return false, nil, nil
 }
