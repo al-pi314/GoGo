@@ -1,5 +1,12 @@
 {
     "date": "timestamp",
     "evolution_cycles": 0,
-    "agents": []
+    "agents": [
+        {
+            "tag": "agent_01"
+        }, 
+        {
+            "tag": "agent_02"
+        }
+    ]
 }
