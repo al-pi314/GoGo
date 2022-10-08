@@ -1,11 +1,14 @@
 package game
 
 import (
+	"fmt"
 	"image/color"
 
 	"github.com/al-pi314/gogo/player"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
+	"github.com/hajimehoshi/ebiten/v2/text"
+	"golang.org/x/image/font/basicfont"
 )
 
 type Cordinate struct {
@@ -21,10 +24,18 @@ type Game struct {
 	WhitePlayer player.Player
 	BlackPlayer player.Player
 
-	board       [][]*bool
-	delay_lock  bool
-	locked      Cordinate
-	whiteToMove bool
+	active bool
+	board  [][]*bool
+
+	delay_lock bool
+	locked     Cordinate
+
+	did_skip     bool
+	whiteToMove  bool
+	black_stones int
+	black_taken  int
+	white_stones int
+	white_taken  int
 }
 
 func NewGame(g Game) *Game {
@@ -33,6 +44,7 @@ func NewGame(g Game) *Game {
 		g.board[y] = make([]*bool, g.Columns)
 	}
 	g.locked = Cordinate{-1, -1}
+	g.active = true
 
 	return &g
 }
@@ -60,7 +72,7 @@ func (g *Game) pieceAt(x, y int) *bool {
 
 func (g *Game) hasRoom(x, y int, white bool, checked map[Cordinate]bool, group *[]Cordinate) bool {
 	c := Cordinate{x, y}
-	if checked, ok := checked[c]; ok && checked {
+	if chk, ok := checked[c]; ok && chk {
 		return false
 	}
 	checked[c] = true
@@ -92,6 +104,63 @@ func (g *Game) hasRoom(x, y int, white bool, checked map[Cordinate]bool, group *
 	return false
 }
 
+func (g *Game) findGroup(x, y int, white bool) []Cordinate {
+	pieceColor := g.pieceAt(x, y)
+	if pieceColor == nil || *pieceColor != white {
+		return nil
+	}
+
+	group := []Cordinate{}
+	if g.hasRoom(x, y, white, map[Cordinate]bool{}, &group) {
+		return nil
+	}
+
+	return group
+}
+
+func updateCtr(whitePtr, blackPtr *int, iswhite bool, cnt int) {
+	if iswhite {
+		blackPtr = whitePtr
+	}
+	*blackPtr += cnt
+}
+
+func (g *Game) asignTeritory(x, y int, checked map[Cordinate]bool) (bool, *bool, int) {
+	c := Cordinate{x, y}
+	if chk, ok := checked[c]; ok && chk {
+		return true, nil, 0
+	}
+	checked[c] = true
+
+	if y < 0 || y >= len(g.board) || x < 0 || x >= len(g.board[y]) {
+		return true, nil, 0
+	}
+	if g.board[y][x] != nil {
+		return true, g.board[y][x], 0
+	}
+
+	prev_uniform, prev_owner, prev_cnt := g.asignTeritory(x, y-1, checked)
+	for _, c := range []Cordinate{{x, y + 1}, {x - 1, y}, {x + 1, y}} {
+		curr_uniform, curr_owner, curr_cnt := g.asignTeritory(c.X, c.Y, checked)
+		// previous teritory is not uniform - does not belong to just one player
+		if !prev_uniform {
+			return false, nil, 0
+		}
+
+		// teritories ownership missmatch
+		if prev_owner != nil && curr_owner != nil && *prev_owner != *curr_owner {
+			return false, nil, 0
+		}
+
+		prev_uniform = curr_uniform
+		if curr_owner != nil {
+			prev_owner = curr_owner
+		}
+		prev_cnt += curr_cnt
+	}
+	return prev_uniform, prev_owner, 1 + prev_cnt
+}
+
 // ------------------------------------ ----------------- ------------------------------------ \\
 
 // -------------------------------------- Game Functions ------------------------------------- \\
@@ -102,6 +171,7 @@ func (g *Game) placePiece(x, y int, white bool) bool {
 	}
 	// place piece
 	g.board[y][x] = &white
+	updateCtr(&g.white_stones, &g.black_stones, white, 1)
 
 	// check for opponent group eliminations
 	if g.caputreOpponent(x, y, white) {
@@ -112,6 +182,7 @@ func (g *Game) placePiece(x, y int, white bool) bool {
 	hasRoom := g.hasRoom(x, y, white, map[Cordinate]bool{}, nil)
 	if !hasRoom {
 		g.board[y][x] = nil
+		updateCtr(&g.white_stones, &g.black_stones, white, -1)
 		return false
 	}
 
@@ -146,34 +217,58 @@ func (g *Game) caputreOpponent(x, y int, white bool) bool {
 	for _, c := range toRemove {
 		g.board[c.Y][c.X] = nil
 	}
+
+	updateCtr(&g.white_stones, &g.black_stones, !white, -len(toRemove))
+	updateCtr(&g.white_taken, &g.black_taken, !white, len(toRemove))
 	return len(toRemove) != 0
 }
 
-func (g *Game) findGroup(x, y int, white bool) []Cordinate {
-	pieceColor := g.pieceAt(x, y)
-	if pieceColor == nil || *pieceColor != white {
-		return nil
+// score calculates game score based on the current position.
+func (g *Game) score() float64 {
+	checked := map[Cordinate]bool{}
+	score := -0.5 + float64(g.white_stones) - float64(g.white_taken) - float64(g.black_stones) + float64(g.black_taken)
+	for y := range g.board {
+		for x := range g.board[y] {
+			if chk, ok := checked[Cordinate{x, y}]; g.board[y][x] != nil || (ok && chk) {
+				continue
+			}
+			uniform, owner, size := g.asignTeritory(x, y, checked)
+			if uniform && owner != nil {
+				sign := 1
+				if !(*owner) {
+					sign = -1
+				}
+				score += float64(sign * size)
+			}
+		}
 	}
-
-	group := []Cordinate{}
-	if g.hasRoom(x, y, white, map[Cordinate]bool{}, &group) {
-		return nil
-	}
-
-	return group
+	return score
 }
 
 // -------------------------------------- -------------- ------------------------------------- \\
 
 // --------------------------- Functions required by ebiten engine --------------------------- \\
 func (g *Game) Update() error {
+	if !g.active {
+		return nil
+	}
+
 	player := g.WhitePlayer
 	if !g.whiteToMove {
 		player = g.BlackPlayer
 	}
 
 	place, x, y, skip := player.Place(g.board)
-	if place && (skip || g.placePiece(x, y, g.whiteToMove)) {
+	if skip || (place && g.placePiece(x, y, g.whiteToMove)) {
+		// consequitive skips end the game
+		if skip && g.did_skip {
+			g.active = false
+		}
+		g.did_skip = false
+		if skip {
+			g.did_skip = true
+		}
+
 		// lock unlocks after next successful move
 		if !g.delay_lock {
 			g.locked.X = -1
@@ -187,6 +282,22 @@ func (g *Game) Update() error {
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
+	// end screen
+	if !g.active {
+		screen.Fill(color.White)
+		score := g.score()
+		winner := "Black"
+		if score >= -0.5 {
+			winner = "White"
+		}
+		face := basicfont.Face7x13
+		txt := fmt.Sprintf("%s player won! Score: %.2f", winner, score)
+		centerX := 0.5*float64(g.Columns*(g.SquareSize+g.BorderSize)+g.BorderSize) - float64(face.Width*len(txt))/2
+		centerY := 0.5 * float64(g.Rows*(g.SquareSize+g.BorderSize)+g.BorderSize)
+		text.Draw(screen, txt, face, int(centerX), int(centerY), color.Black)
+		return
+	}
+
 	// draw board - squares with left and top borders
 	for x := 0; x <= g.Columns+1; x++ {
 		for y := 0; y <= g.Rows+1; y++ {
