@@ -14,7 +14,8 @@ type Structure struct {
 }
 
 type NeuralNetwork struct {
-	Structure Structure
+	Structure      Structure
+	ActivationFunc func(float64) float64
 
 	wHiddenByLayer []*mat.Dense
 	bHiddenByLayer []*mat.Dense
@@ -23,17 +24,13 @@ type NeuralNetwork struct {
 	bOut *mat.Dense
 }
 
-func NewNeuralNetwork(s Structure) *NeuralNetwork {
-	nn := NeuralNetwork{
-		Structure: s,
-	}
-
+func NewNeuralNetwork(nn NeuralNetwork) *NeuralNetwork {
 	nn.wHiddenByLayer = []*mat.Dense{}
 	nn.bHiddenByLayer = []*mat.Dense{}
 	randomise := [][]float64{}
 
-	prev_layer_size := s.InputNeurons
-	for _, curr_layer_size := range s.HiddenNeuronsByLayer {
+	prev_layer_size := nn.Structure.InputNeurons
+	for _, curr_layer_size := range nn.Structure.HiddenNeuronsByLayer {
 		currW := mat.NewDense(prev_layer_size, curr_layer_size, nil)
 		nn.wHiddenByLayer = append(nn.wHiddenByLayer, currW)
 		randomise = append(randomise, currW.RawMatrix().Data)
@@ -45,9 +42,9 @@ func NewNeuralNetwork(s Structure) *NeuralNetwork {
 		prev_layer_size = curr_layer_size
 	}
 
-	nn.wOut = mat.NewDense(prev_layer_size, s.OutputNeurons, nil)
+	nn.wOut = mat.NewDense(prev_layer_size, nn.Structure.OutputNeurons, nil)
 	randomise = append(randomise, nn.wOut.RawMatrix().Data)
-	nn.bOut = mat.NewDense(1, s.OutputNeurons, nil)
+	nn.bOut = mat.NewDense(1, nn.Structure.OutputNeurons, nil)
 	randomise = append(randomise, nn.bOut.RawMatrix().Data)
 
 	for _, param := range randomise {
@@ -69,8 +66,8 @@ func (nn *NeuralNetwork) Predict(input *mat.Dense) *mat.Dense {
 	applyReLU := func(_, _ int, v float64) float64 {
 		return math.Max(0, v)
 	}
-	applySigmoid := func(_, _ int, v float64) float64 {
-		return 1.0 / (1.0 + math.Exp(-v))
+	applyActivation := func(_, _ int, v float64) float64 {
+		return nn.ActivationFunc(v)
 	}
 
 	prev_activation := input
@@ -87,7 +84,42 @@ func (nn *NeuralNetwork) Predict(input *mat.Dense) *mat.Dense {
 	outputLayerInput := new(mat.Dense)
 	outputLayerInput.Mul(prev_activation, nn.wOut)
 	outputLayerInput.Apply(addBaseFunction(nn.bOut), outputLayerInput)
-	output.Apply(applySigmoid, outputLayerInput)
+	output.Apply(applyActivation, outputLayerInput)
 
 	return output
+}
+
+func (nn *NeuralNetwork) Mutate(rate float64) *NeuralNetwork {
+	newNN := NeuralNetwork{
+		Structure:      nn.Structure,
+		ActivationFunc: nn.ActivationFunc,
+		wHiddenByLayer: []*mat.Dense{},
+		bHiddenByLayer: []*mat.Dense{},
+		wOut:           &mat.Dense{},
+		bOut:           &mat.Dense{},
+	}
+
+	mutateFunc := func(i int, j int, v float64) float64 {
+		if rand.Float64() > rate {
+			return -1 + 2*rand.Float64()
+		}
+		return v
+	}
+
+	for _, layer := range nn.wHiddenByLayer {
+		newWeights := mat.Dense{}
+		newNN.wHiddenByLayer = append(newNN.wHiddenByLayer, &newWeights)
+		layer.Apply(mutateFunc, &newWeights)
+	}
+
+	for _, layer := range nn.bHiddenByLayer {
+		newBiases := mat.Dense{}
+		newNN.bHiddenByLayer = append(newNN.bHiddenByLayer, &newBiases)
+		layer.Apply(mutateFunc, &newBiases)
+	}
+
+	nn.wOut.Apply(mutateFunc, newNN.wOut)
+	nn.bOut.Apply(mutateFunc, newNN.bOut)
+
+	return &newNN
 }

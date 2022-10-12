@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"math"
 	"math/rand"
 
 	"github.com/al-pi314/gogo/game"
@@ -31,11 +32,15 @@ func main() {
 		YSnap: squareSize + borderSize,
 	})
 	blackPlayer := player.NewAgent(player.Agent{
-		Logic: nn.NewNeuralNetwork(nn.Structure{
-			InputNeurons:         3 * rows * columns,
-			HiddenNeuronsByLayer: []int{50, 100, 50},
-			OutputNeurons:        3,
-		}),
+		Logic: nn.NewNeuralNetwork(nn.NeuralNetwork{
+			Structure: nn.Structure{
+				InputNeurons:         3 * rows * columns,
+				HiddenNeuronsByLayer: []int{50, 100, 50},
+				OutputNeurons:        3,
+			},
+			ActivationFunc: func(v float64) float64 { return float64(rows) / (1.0 + math.Exp(-v)) },
+		},
+		),
 	})
 
 	game := game.NewGame(game.Game{

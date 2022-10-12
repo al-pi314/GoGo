@@ -6,7 +6,9 @@ import (
 )
 
 type Agent struct {
-	Logic *nn.NeuralNetwork
+	StabilizationRate float64
+	MutationRate      float64
+	Logic             *nn.NeuralNetwork
 }
 
 func NewAgent(p Agent) Player {
@@ -42,14 +44,26 @@ func encodeBoard(board [][]*bool) *mat.Dense {
 	return mat.NewDense(1, len(raw), raw)
 }
 
-func interperate(output *mat.Dense, columns, rows int) (bool, *int, *int) {
+func interperate(output *mat.Dense) (bool, *int, *int) {
 	if output == nil {
 		return false, nil, nil
 	}
 
-	x := int(float64(columns) * output.At(0, 1))
-	y := int(float64(rows) * output.At(0, 1))
+	x := int(output.At(0, 1))
+	y := int(output.At(0, 1))
 	return output.At(0, 0) >= 0.5, &x, &y
+}
+
+func (p *Agent) Offsprint(n int) []Agent {
+	newAgents := []Agent{}
+	for i := 0; i < n; i++ {
+		newAgents = append(newAgents, Agent{
+			StabilizationRate: p.StabilizationRate,
+			MutationRate:      (1 - p.StabilizationRate) * p.MutationRate,
+			Logic:             p.Logic.Mutate(p.MutationRate),
+		})
+	}
+	return newAgents
 }
 
 func (p *Agent) Place(board [][]*bool) (bool, *int, *int) {
@@ -58,5 +72,5 @@ func (p *Agent) Place(board [][]*bool) (bool, *int, *int) {
 	}
 
 	result := p.Logic.Predict(encodeBoard(board))
-	return interperate(result, len(board), len(board[0]))
+	return interperate(result)
 }
