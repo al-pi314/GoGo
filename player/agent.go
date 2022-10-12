@@ -11,8 +11,8 @@ type Agent struct {
 	Logic             *nn.NeuralNetwork
 }
 
-func NewAgent(p Agent) Player {
-	return &p
+func NewAgent(p Agent) Agent {
+	return p
 }
 
 func encodeBoard(board [][]*bool) *mat.Dense {
@@ -54,16 +54,12 @@ func interperate(output *mat.Dense) (bool, *int, *int) {
 	return output.At(0, 0) >= 0.5, &x, &y
 }
 
-func (p *Agent) Offsprint(n int) []Agent {
-	newAgents := []Agent{}
-	for i := 0; i < n; i++ {
-		newAgents = append(newAgents, Agent{
-			StabilizationRate: p.StabilizationRate,
-			MutationRate:      (1 - p.StabilizationRate) * p.MutationRate,
-			Logic:             p.Logic.Mutate(p.MutationRate),
-		})
+func (p *Agent) Offsprint() *Agent {
+	return &Agent{
+		StabilizationRate: p.StabilizationRate,
+		MutationRate:      (1 - p.StabilizationRate) * p.MutationRate,
+		Logic:             p.Logic.Mutate(p.MutationRate),
 	}
-	return newAgents
 }
 
 func (p *Agent) Place(board [][]*bool) (bool, *int, *int) {

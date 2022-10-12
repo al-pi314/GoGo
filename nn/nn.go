@@ -95,8 +95,8 @@ func (nn *NeuralNetwork) Mutate(rate float64) *NeuralNetwork {
 		ActivationFunc: nn.ActivationFunc,
 		wHiddenByLayer: []*mat.Dense{},
 		bHiddenByLayer: []*mat.Dense{},
-		wOut:           &mat.Dense{},
-		bOut:           &mat.Dense{},
+		wOut:           mat.NewDense(nn.wOut.RawMatrix().Rows, nn.wOut.RawMatrix().Cols, nil),
+		bOut:           mat.NewDense(nn.bOut.RawMatrix().Rows, nn.bOut.RawMatrix().Cols, nil),
 	}
 
 	mutateFunc := func(i int, j int, v float64) float64 {
@@ -107,15 +107,15 @@ func (nn *NeuralNetwork) Mutate(rate float64) *NeuralNetwork {
 	}
 
 	for _, layer := range nn.wHiddenByLayer {
-		newWeights := mat.Dense{}
-		newNN.wHiddenByLayer = append(newNN.wHiddenByLayer, &newWeights)
-		layer.Apply(mutateFunc, &newWeights)
+		newWeights := mat.NewDense(layer.RawMatrix().Rows, layer.RawMatrix().Cols, nil)
+		newNN.wHiddenByLayer = append(newNN.wHiddenByLayer, newWeights)
+		newWeights.Apply(mutateFunc, layer)
 	}
 
 	for _, layer := range nn.bHiddenByLayer {
-		newBiases := mat.Dense{}
-		newNN.bHiddenByLayer = append(newNN.bHiddenByLayer, &newBiases)
-		layer.Apply(mutateFunc, &newBiases)
+		newBiases := mat.NewDense(layer.RawMatrix().Rows, layer.RawMatrix().Cols, nil)
+		newNN.bHiddenByLayer = append(newNN.bHiddenByLayer, newBiases)
+		newBiases.Apply(mutateFunc, layer)
 	}
 
 	nn.wOut.Apply(mutateFunc, newNN.wOut)

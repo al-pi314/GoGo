@@ -1,6 +1,7 @@
 package game
 
 import (
+	"errors"
 	"fmt"
 	"image/color"
 
@@ -17,8 +18,7 @@ type Cordinate struct {
 }
 
 type Game struct {
-	Rows        int
-	Columns     int
+	Dymension   int
 	SquareSize  int
 	BorderSize  int
 	WhitePlayer player.Player
@@ -30,8 +30,10 @@ type Game struct {
 	delay_lock bool
 	locked     Cordinate
 
-	did_skip     bool
-	whiteToMove  bool
+	did_skip    bool
+	whiteToMove bool
+	failedMoves int
+
 	black_stones int
 	black_taken  int
 	white_stones int
@@ -39,9 +41,9 @@ type Game struct {
 }
 
 func NewGame(g Game) *Game {
-	g.board = make([][]*bool, g.Rows)
+	g.board = make([][]*bool, g.Dymension)
 	for y := range g.board {
-		g.board[y] = make([]*bool, g.Columns)
+		g.board[y] = make([]*bool, g.Dymension)
 	}
 	g.locked = Cordinate{-1, -1}
 	g.active = true
@@ -51,7 +53,8 @@ func NewGame(g Game) *Game {
 
 // ------------------------------------ Helper Functions ------------------------------------ \\
 func (g *Game) Size() (int, int) {
-	return g.Columns*(g.SquareSize+g.BorderSize) + g.BorderSize, g.Rows*(g.SquareSize+g.BorderSize) + g.BorderSize
+	side := g.Dymension*(g.SquareSize+g.BorderSize) + g.BorderSize
+	return side, side
 }
 
 // drawSquare draws a square on the image.
@@ -223,8 +226,8 @@ func (g *Game) caputreOpponent(x, y int, white bool) bool {
 	return len(toRemove) != 0
 }
 
-// score calculates game score based on the current position.
-func (g *Game) score() float64 {
+// Score calculates game score based on the current position.
+func (g *Game) Score() float64 {
 	checked := map[Cordinate]bool{}
 	score := -0.5 + float64(g.white_stones) - float64(g.white_taken) - float64(g.black_stones) + float64(g.black_taken)
 	for y := range g.board {
@@ -250,7 +253,7 @@ func (g *Game) score() float64 {
 // --------------------------- Functions required by ebiten engine --------------------------- \\
 func (g *Game) Update() error {
 	if !g.active {
-		return nil
+		return errors.New("game finished")
 	}
 
 	player := g.WhitePlayer
@@ -259,6 +262,7 @@ func (g *Game) Update() error {
 	}
 
 	skip, x, y := player.Place(g.board)
+	skip = skip || g.failedMoves == 3
 	if skip || ((x != nil && y != nil) && g.placePiece(*x, *y, g.whiteToMove)) {
 		// consequitive skips end the game
 		if skip && g.did_skip {
@@ -276,7 +280,10 @@ func (g *Game) Update() error {
 		}
 		g.delay_lock = false
 		// change player to move
+		g.failedMoves = 0
 		g.whiteToMove = !g.whiteToMove
+	} else {
+		g.failedMoves++
 	}
 	return nil
 }
@@ -285,39 +292,39 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	// end screen
 	if !g.active {
 		screen.Fill(color.White)
-		score := g.score()
+		score := g.Score()
 		winner := "Black"
 		if score >= -0.5 {
 			winner = "White"
 		}
 		face := basicfont.Face7x13
 		txt := fmt.Sprintf("%s player won! Score: %.2f", winner, score)
-		centerX := 0.5*float64(g.Columns*(g.SquareSize+g.BorderSize)+g.BorderSize) - float64(face.Width*len(txt))/2
-		centerY := 0.5 * float64(g.Rows*(g.SquareSize+g.BorderSize)+g.BorderSize)
+		centerX := 0.5*float64(g.Dymension*(g.SquareSize+g.BorderSize)+g.BorderSize) - float64(face.Width*len(txt))/2
+		centerY := 0.5 * float64(g.Dymension*(g.SquareSize+g.BorderSize)+g.BorderSize)
 		text.Draw(screen, txt, face, int(centerX), int(centerY), color.Black)
 		return
 	}
 
 	// draw board - squares with left and top borders
-	for x := 0; x <= g.Columns+1; x++ {
-		for y := 0; y <= g.Rows+1; y++ {
+	for x := 0; x <= g.Dymension+1; x++ {
+		for y := 0; y <= g.Dymension+1; y++ {
 			x1 := x * (g.BorderSize + g.SquareSize)
 			y1 := y * (g.BorderSize + g.SquareSize)
 			// draw left border
-			if y <= g.Rows {
+			if y <= g.Dymension {
 				x2 := x1 + g.BorderSize
 				y2 := y1 + g.SquareSize + g.BorderSize
 				g.drawSquare(screen, x1, y1, x2, y2, color.RGBA{160, 175, 190, 1})
 			}
 			// draw top border
-			if x <= g.Columns {
+			if x <= g.Dymension {
 				x2 := x1 + g.SquareSize + g.BorderSize
 				y2 := y1 + g.BorderSize
 				g.drawSquare(screen, x1, y1, x2, y2, color.RGBA{160, 175, 190, 1})
 			}
 
 			// draw empty square when inside the board
-			if x <= g.Columns && y <= g.Rows {
+			if x <= g.Dymension && y <= g.Dymension {
 				x1 += g.BorderSize
 				y1 += g.BorderSize
 				x2 := x1 + g.SquareSize
@@ -346,7 +353,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 }
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeight int) {
-	return g.Rows*(g.BorderSize+g.SquareSize) + g.BorderSize, g.Columns*(g.BorderSize+g.SquareSize) + g.BorderSize
+	return g.Size()
 }
 
 // --------------------------- ------------------------------------ --------------------------- \\

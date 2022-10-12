@@ -16,16 +16,14 @@ func loadConfig() {
 	viper.SetEnvPrefix("X")
 	viper.SetConfigFile(".env")
 	viper.ReadInConfig()
+	rand.Seed(viper.GetInt64("RANDOM_SEED"))
 }
 
 func main() {
 	loadConfig()
 	squareSize := viper.GetInt("SQUARE_SIZE")
 	borderSize := viper.GetInt("BORDER_SIZE")
-	rows := viper.GetInt("ROWS")
-	columns := viper.GetInt("COLUMNS")
-
-	rand.Seed(viper.GetInt64("RANDOM_SEED"))
+	dymension := viper.GetInt("DYMENSION")
 
 	whitePlayer := player.NewHuman(player.Human{
 		XSnap: squareSize + borderSize,
@@ -34,22 +32,21 @@ func main() {
 	blackPlayer := player.NewAgent(player.Agent{
 		Logic: nn.NewNeuralNetwork(nn.NeuralNetwork{
 			Structure: nn.Structure{
-				InputNeurons:         3 * rows * columns,
+				InputNeurons:         3 * dymension * dymension,
 				HiddenNeuronsByLayer: []int{50, 100, 50},
 				OutputNeurons:        3,
 			},
-			ActivationFunc: func(v float64) float64 { return float64(rows) / (1.0 + math.Exp(-v)) },
+			ActivationFunc: func(v float64) float64 { return float64(dymension) / (1.0 + math.Exp(-v)) },
 		},
 		),
 	})
 
 	game := game.NewGame(game.Game{
-		Rows:        rows,
-		Columns:     columns,
+		Dymension:   dymension,
 		SquareSize:  squareSize,
 		BorderSize:  borderSize,
 		WhitePlayer: whitePlayer,
-		BlackPlayer: blackPlayer,
+		BlackPlayer: &blackPlayer,
 	})
 
 	ebiten.SetTPS(ebiten.SyncWithFPS)
