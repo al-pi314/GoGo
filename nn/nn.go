@@ -1,9 +1,11 @@
 package nn
 
 import (
+	"encoding/json"
 	"math"
 	"math/rand"
 
+	"github.com/pkg/errors"
 	"gonum.org/v1/gonum/mat"
 )
 
@@ -13,41 +15,70 @@ type Structure struct {
 	OutputNeurons        int
 }
 
+type MatDense struct {
+	M *mat.Dense
+}
+
 type NeuralNetwork struct {
 	Structure          Structure
 	ActivationFuncName string
 	activation         func(float64) float64
 
-	wHiddenByLayer []*mat.Dense
-	bHiddenByLayer []*mat.Dense
+	WHiddenByLayer []MatDense
+	BHiddenByLayer []MatDense
 
-	wOut *mat.Dense
-	bOut *mat.Dense
+	WOut MatDense
+	BOut MatDense
+}
+
+func (matDense MatDense) MarshalJSON() ([]byte, error) {
+	marshalable := map[string]interface{}{}
+	marshalable["rows"] = matDense.M.RawMatrix().Rows
+	marshalable["cols"] = matDense.M.RawMatrix().Cols
+	marshalable["data"] = matDense.M.RawMatrix().Data
+	return json.Marshal(marshalable)
+}
+
+func (MatDense *MatDense) UnmarshalJSON(b []byte) error {
+	marshalable := map[string]interface{}{}
+	if err := json.Unmarshal(b, &marshalable); err != nil {
+		return errors.Wrap(err, "custom type MatDense unmarshal error")
+	}
+	data := []float64{}
+	unmarshaledData := marshalable["data"].([]interface{})
+	for _, v := range unmarshaledData {
+		data = append(data, v.(float64))
+	}
+
+	MatDense.M = mat.NewDense(marshalable["rows"].(int), marshalable["cols"].(int), data)
+	return nil
 }
 
 func NewNeuralNetwork(nn NeuralNetwork) *NeuralNetwork {
 	nn.activation = ActivationFunc(nn.ActivationFuncName)
-	nn.wHiddenByLayer = []*mat.Dense{}
-	nn.bHiddenByLayer = []*mat.Dense{}
+	nn.WHiddenByLayer = []MatDense{}
+	nn.BHiddenByLayer = []MatDense{}
+	nn.WOut = MatDense{}
+	nn.BOut = MatDense{}
 	randomise := [][]float64{}
 
 	prev_layer_size := nn.Structure.InputNeurons
 	for _, curr_layer_size := range nn.Structure.HiddenNeuronsByLayer {
 		currW := mat.NewDense(prev_layer_size, curr_layer_size, nil)
-		nn.wHiddenByLayer = append(nn.wHiddenByLayer, currW)
+		nn.WHiddenByLayer = append(nn.WHiddenByLayer, MatDense{currW})
 		randomise = append(randomise, currW.RawMatrix().Data)
 
 		currB := mat.NewDense(1, curr_layer_size, nil)
-		nn.bHiddenByLayer = append(nn.bHiddenByLayer, currB)
+		nn.BHiddenByLayer = append(nn.BHiddenByLayer, MatDense{currB})
 		randomise = append(randomise, currB.RawMatrix().Data)
 
 		prev_layer_size = curr_layer_size
 	}
 
-	nn.wOut = mat.NewDense(prev_layer_size, nn.Structure.OutputNeurons, nil)
-	randomise = append(randomise, nn.wOut.RawMatrix().Data)
-	nn.bOut = mat.NewDense(1, nn.Structure.OutputNeurons, nil)
-	randomise = append(randomise, nn.bOut.RawMatrix().Data)
+	nn.WOut.M = mat.NewDense(prev_layer_size, nn.Structure.OutputNeurons, nil)
+	randomise = append(randomise, nn.WOut.M.RawMatrix().Data)
+	nn.BOut.M = mat.NewDense(1, nn.Structure.OutputNeurons, nil)
+	randomise = append(randomise, nn.BOut.M.RawMatrix().Data)
 
 	for _, param := range randomise {
 		for i := range param {
@@ -75,8 +106,8 @@ func (nn *NeuralNetwork) Predict(input *mat.Dense) *mat.Dense {
 	prev_activation := input
 	for i := range nn.Structure.HiddenNeuronsByLayer {
 		hiddenLayerInput := new(mat.Dense)
-		hiddenLayerInput.Mul(prev_activation, nn.wHiddenByLayer[i])
-		hiddenLayerInput.Apply(addBaseFunction(nn.bHiddenByLayer[i]), hiddenLayerInput)
+		hiddenLayerInput.Mul(prev_activation, nn.WHiddenByLayer[i].M)
+		hiddenLayerInput.Apply(addBaseFunction(nn.BHiddenByLayer[i].M), hiddenLayerInput)
 		hiddenLayerActivations := new(mat.Dense)
 		hiddenLayerActivations.Apply(applyReLU, hiddenLayerInput)
 
@@ -84,8 +115,8 @@ func (nn *NeuralNetwork) Predict(input *mat.Dense) *mat.Dense {
 	}
 
 	outputLayerInput := new(mat.Dense)
-	outputLayerInput.Mul(prev_activation, nn.wOut)
-	outputLayerInput.Apply(addBaseFunction(nn.bOut), outputLayerInput)
+	outputLayerInput.Mul(prev_activation, nn.WOut.M)
+	outputLayerInput.Apply(addBaseFunction(nn.BOut.M), outputLayerInput)
 	output.Apply(applyActivation, outputLayerInput)
 
 	return output
@@ -96,10 +127,10 @@ func (nn *NeuralNetwork) Mutate(rate float64) *NeuralNetwork {
 		Structure:          nn.Structure,
 		ActivationFuncName: nn.ActivationFuncName,
 		activation:         nn.activation,
-		wHiddenByLayer:     []*mat.Dense{},
-		bHiddenByLayer:     []*mat.Dense{},
-		wOut:               mat.NewDense(nn.wOut.RawMatrix().Rows, nn.wOut.RawMatrix().Cols, nil),
-		bOut:               mat.NewDense(nn.bOut.RawMatrix().Rows, nn.bOut.RawMatrix().Cols, nil),
+		WHiddenByLayer:     []MatDense{},
+		BHiddenByLayer:     []MatDense{},
+		WOut:               MatDense{mat.NewDense(nn.WOut.M.RawMatrix().Rows, nn.WOut.M.RawMatrix().Cols, nil)},
+		BOut:               MatDense{mat.NewDense(nn.BOut.M.RawMatrix().Rows, nn.BOut.M.RawMatrix().Cols, nil)},
 	}
 
 	mutateFunc := func(i int, j int, v float64) float64 {
@@ -109,20 +140,20 @@ func (nn *NeuralNetwork) Mutate(rate float64) *NeuralNetwork {
 		return v
 	}
 
-	for _, layer := range nn.wHiddenByLayer {
-		newWeights := mat.NewDense(layer.RawMatrix().Rows, layer.RawMatrix().Cols, nil)
-		newNN.wHiddenByLayer = append(newNN.wHiddenByLayer, newWeights)
-		newWeights.Apply(mutateFunc, layer)
+	for _, layer := range nn.WHiddenByLayer {
+		newWeights := mat.NewDense(layer.M.RawMatrix().Rows, layer.M.RawMatrix().Cols, nil)
+		newNN.WHiddenByLayer = append(newNN.WHiddenByLayer, MatDense{newWeights})
+		newWeights.Apply(mutateFunc, layer.M)
 	}
 
-	for _, layer := range nn.bHiddenByLayer {
-		newBiases := mat.NewDense(layer.RawMatrix().Rows, layer.RawMatrix().Cols, nil)
-		newNN.bHiddenByLayer = append(newNN.bHiddenByLayer, newBiases)
-		newBiases.Apply(mutateFunc, layer)
+	for _, layer := range nn.BHiddenByLayer {
+		newBiases := mat.NewDense(layer.M.RawMatrix().Rows, layer.M.RawMatrix().Cols, nil)
+		newNN.BHiddenByLayer = append(newNN.BHiddenByLayer, MatDense{newBiases})
+		newBiases.Apply(mutateFunc, layer.M)
 	}
 
-	nn.wOut.Apply(mutateFunc, newNN.wOut)
-	nn.bOut.Apply(mutateFunc, newNN.bOut)
+	nn.WOut.M.Apply(mutateFunc, newNN.WOut.M)
+	nn.BOut.M.Apply(mutateFunc, newNN.BOut.M)
 
 	return &newNN
 }
