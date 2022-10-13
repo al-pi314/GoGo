@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"image/color"
 
+	"github.com/al-pi314/gogo"
 	"github.com/al-pi314/gogo/player"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
@@ -24,26 +25,23 @@ type Game struct {
 	WhitePlayer player.Player
 	BlackPlayer player.Player
 
-	active bool
-	board  [][]*bool
+	active      bool
+	whiteToMove bool
 
 	delay_lock bool
 	locked     Cordinate
 
-	did_skip    bool
-	whiteToMove bool
-	failedMoves int
-
-	black_stones int
-	black_taken  int
-	white_stones int
-	white_taken  int
+	gameState *GameState
 }
 
+type GameState = gogo.GameState
+
 func NewGame(g Game) *Game {
-	g.board = make([][]*bool, g.Dymension)
-	for y := range g.board {
-		g.board[y] = make([]*bool, g.Dymension)
+	g.gameState = &GameState{
+		Board: make([][]*bool, g.Dymension),
+	}
+	for y := range g.gameState.Board {
+		g.gameState.Board[y] = make([]*bool, g.Dymension)
 	}
 	g.locked = Cordinate{-1, -1}
 	g.active = true
@@ -67,10 +65,10 @@ func (g *Game) drawSquare(screen *ebiten.Image, x1, y1, x2, y2 int, clr color.Co
 }
 
 func (g *Game) pieceAt(x, y int) *bool {
-	if y >= len(g.board) || y < 0 || x >= len(g.board[y]) || x < 0 {
+	if y >= len(g.gameState.Board) || y < 0 || x >= len(g.gameState.Board[y]) || x < 0 {
 		return nil
 	}
-	return g.board[y][x]
+	return g.gameState.Board[y][x]
 }
 
 func (g *Game) hasRoom(x, y int, white bool, checked map[Cordinate]bool, group *[]Cordinate) bool {
@@ -80,15 +78,15 @@ func (g *Game) hasRoom(x, y int, white bool, checked map[Cordinate]bool, group *
 	}
 	checked[c] = true
 
-	if y >= len(g.board) || y < 0 || x >= len(g.board[y]) || x < 0 {
+	if y >= len(g.gameState.Board) || y < 0 || x >= len(g.gameState.Board[y]) || x < 0 {
 		return false
 	}
 
-	if g.board[y][x] == nil {
+	if g.gameState.Board[y][x] == nil {
 		return true
 	}
 
-	if *g.board[y][x] != white {
+	if *g.gameState.Board[y][x] != white {
 		return false
 	}
 
@@ -135,11 +133,11 @@ func (g *Game) asignTeritory(x, y int, checked map[Cordinate]bool) (bool, *bool,
 	}
 	checked[c] = true
 
-	if y < 0 || y >= len(g.board) || x < 0 || x >= len(g.board[y]) {
+	if y < 0 || y >= len(g.gameState.Board) || x < 0 || x >= len(g.gameState.Board[y]) {
 		return true, nil, 0
 	}
-	if g.board[y][x] != nil {
-		return true, g.board[y][x], 0
+	if g.gameState.Board[y][x] != nil {
+		return true, g.gameState.Board[y][x], 0
 	}
 
 	prev_uniform, prev_owner, prev_cnt := g.asignTeritory(x, y-1, checked)
@@ -169,12 +167,12 @@ func (g *Game) asignTeritory(x, y int, checked map[Cordinate]bool) (bool, *bool,
 // -------------------------------------- Game Functions ------------------------------------- \\
 func (g *Game) placePiece(x, y int, white bool) bool {
 	// out of bounds or already occupied spaces are invalid
-	if y >= len(g.board) || y < 0 || x >= len(g.board[y]) || x < 0 || g.board[y][x] != nil {
+	if y >= len(g.gameState.Board) || y < 0 || x >= len(g.gameState.Board[y]) || x < 0 || g.gameState.Board[y][x] != nil {
 		return false
 	}
 	// place piece
-	g.board[y][x] = &white
-	updateCtr(&g.white_stones, &g.black_stones, white, 1)
+	g.gameState.Board[y][x] = &white
+	updateCtr(&g.gameState.WhiteStones, &g.gameState.BlackStones, white, 1)
 
 	// check for opponent group eliminations
 	if g.caputreOpponent(x, y, white) {
@@ -184,8 +182,8 @@ func (g *Game) placePiece(x, y int, white bool) bool {
 	// would be eliminated when placed
 	hasRoom := g.hasRoom(x, y, white, map[Cordinate]bool{}, nil)
 	if !hasRoom {
-		g.board[y][x] = nil
-		updateCtr(&g.white_stones, &g.black_stones, white, -1)
+		g.gameState.Board[y][x] = nil
+		updateCtr(&g.gameState.WhiteStones, &g.gameState.BlackStones, white, -1)
 		return false
 	}
 
@@ -218,21 +216,21 @@ func (g *Game) caputreOpponent(x, y int, white bool) bool {
 	}
 
 	for _, c := range toRemove {
-		g.board[c.Y][c.X] = nil
+		g.gameState.Board[c.Y][c.X] = nil
 	}
 
-	updateCtr(&g.white_stones, &g.black_stones, !white, -len(toRemove))
-	updateCtr(&g.white_taken, &g.black_taken, !white, len(toRemove))
+	updateCtr(&g.gameState.WhiteStones, &g.gameState.BlackStones, !white, -len(toRemove))
+	updateCtr(&g.gameState.WhiteStonesCaptured, &g.gameState.BlackStonesCaptured, !white, len(toRemove))
 	return len(toRemove) != 0
 }
 
 // Score calculates game score based on the current position.
 func (g *Game) Score() float64 {
 	checked := map[Cordinate]bool{}
-	score := -0.5 + float64(g.white_stones) - float64(g.white_taken) - float64(g.black_stones) + float64(g.black_taken)
-	for y := range g.board {
-		for x := range g.board[y] {
-			if chk, ok := checked[Cordinate{x, y}]; g.board[y][x] != nil || (ok && chk) {
+	score := -0.5 + float64(g.gameState.WhiteStones) - float64(g.gameState.WhiteStonesCaptured) - float64(g.gameState.BlackStones) + float64(g.gameState.BlackStonesCaptured)
+	for y := range g.gameState.Board {
+		for x := range g.gameState.Board[y] {
+			if chk, ok := checked[Cordinate{x, y}]; g.gameState.Board[y][x] != nil || (ok && chk) {
 				continue
 			}
 			uniform, owner, size := g.asignTeritory(x, y, checked)
@@ -261,16 +259,16 @@ func (g *Game) Update() error {
 		player = g.BlackPlayer
 	}
 
-	skip, x, y := player.Place(g.board)
-	skip = skip || g.failedMoves == 3
+	skip, x, y := player.Place(g.gameState)
+	skip = skip || g.gameState.MyFailedMoves == 3
 	if skip || ((x != nil && y != nil) && g.placePiece(*x, *y, g.whiteToMove)) {
 		// consequitive skips end the game
-		if skip && g.did_skip {
+		if skip && g.gameState.OpponentSkipped {
 			g.active = false
 		}
-		g.did_skip = false
+		g.gameState.OpponentSkipped = false
 		if skip {
-			g.did_skip = true
+			g.gameState.OpponentSkipped = true
 		}
 
 		// lock unlocks after next successful move
@@ -280,10 +278,10 @@ func (g *Game) Update() error {
 		}
 		g.delay_lock = false
 		// change player to move
-		g.failedMoves = 0
+		g.gameState.MyFailedMoves = 0
 		g.whiteToMove = !g.whiteToMove
 	} else if !player.IsHuman() {
-		g.failedMoves++
+		g.gameState.MyFailedMoves++
 	}
 	return nil
 }
@@ -335,7 +333,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}
 
 	// draw pieces
-	for piece_y, row := range g.board {
+	for piece_y, row := range g.gameState.Board {
 		for piece_x, piece := range row {
 			if piece == nil {
 				continue

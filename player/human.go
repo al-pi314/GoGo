@@ -19,7 +19,7 @@ func (p *Human) IsHuman() bool {
 }
 
 // Place implements player logic for placing their piece. Returns wether to place the piece or not, piece position and weather to skip move.
-func (p *Human) Place(board [][]*bool) (bool, *int, *int) {
+func (p *Human) Place(state *GameState) (bool, *int, *int) {
 	if ebiten.IsFocused() {
 		switch {
 		case inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft):

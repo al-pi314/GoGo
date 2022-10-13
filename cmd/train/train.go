@@ -9,6 +9,7 @@ import (
 	"os"
 	"sort"
 
+	"github.com/al-pi314/gogo"
 	"github.com/al-pi314/gogo/game"
 	"github.com/al-pi314/gogo/nn"
 	"github.com/al-pi314/gogo/player"
@@ -50,7 +51,7 @@ func main() {
 			MutationRate:      mutationRate,
 			Logic: nn.NewNeuralNetwork(nn.NeuralNetwork{
 				Structure: nn.Structure{
-					InputNeurons:         3 * dymension * dymension,
+					InputNeurons:         3*dymension*dymension + gogo.GameStateSize(),
 					HiddenNeuronsByLayer: hidden_layer,
 					OutputNeurons:        3,
 				},

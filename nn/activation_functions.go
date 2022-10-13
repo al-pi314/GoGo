@@ -14,5 +14,5 @@ func ActivationFunc(name string) func(float64) float64 {
 }
 
 func sigmoid(v float64) float64 {
-	return float64(v) / (1.0 + math.Exp(-v))
+	return 1 / (1.0 + math.Exp(-v))
 }
