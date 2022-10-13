@@ -227,7 +227,7 @@ func (g *Game) caputreOpponent(x, y int, white bool) bool {
 // Score calculates game score based on the current position.
 func (g *Game) Score() float64 {
 	checked := map[Cordinate]bool{}
-	score := -0.5 + float64(g.gameState.WhiteStones) - float64(g.gameState.WhiteStonesCaptured) - float64(g.gameState.BlackStones) + float64(g.gameState.BlackStonesCaptured)
+	score := 0.5 + float64(g.gameState.WhiteStones) - float64(g.gameState.WhiteStonesCaptured) - float64(g.gameState.BlackStones) + float64(g.gameState.BlackStonesCaptured)
 	for y := range g.gameState.Board {
 		for x := range g.gameState.Board[y] {
 			if chk, ok := checked[Cordinate{x, y}]; g.gameState.Board[y][x] != nil || (ok && chk) {
@@ -289,7 +289,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		screen.Fill(color.White)
 		score := g.Score()
 		winner := "Black"
-		if score >= -0.5 {
+		if score >= 0.0 {
 			winner = "White"
 		}
 		face := basicfont.Face7x13
