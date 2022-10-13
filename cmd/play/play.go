@@ -45,7 +45,7 @@ func main() {
 		Dymension:   dymension,
 		SquareSize:  squareSize,
 		BorderSize:  borderSize,
-		WhitePlayer: whitePlayer,
+		WhitePlayer: &whitePlayer,
 		BlackPlayer: &blackPlayer,
 	})
 

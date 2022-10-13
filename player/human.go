@@ -10,8 +10,8 @@ type Human struct {
 	YSnap int
 }
 
-func NewHuman(p Human) Player {
-	return &p
+func NewHuman(p Human) Human {
+	return p
 }
 
 // Place implements player logic for placing their piece. Returns wether to place the piece or not, piece position and weather to skip move.
