@@ -2,7 +2,6 @@ package main
 
 import (
 	"log"
-	"math"
 	"math/rand"
 
 	"github.com/al-pi314/gogo/game"
@@ -24,6 +23,8 @@ func main() {
 	squareSize := viper.GetInt("SQUARE_SIZE")
 	borderSize := viper.GetInt("BORDER_SIZE")
 	dymension := viper.GetInt("DYMENSION")
+	activation := viper.GetString("ACTIVATION")
+	hidden_layer := viper.GetIntSlice("HIDDEN_LAYER")
 
 	whitePlayer := player.NewHuman(player.Human{
 		XSnap: squareSize + borderSize,
@@ -33,10 +34,10 @@ func main() {
 		Logic: nn.NewNeuralNetwork(nn.NeuralNetwork{
 			Structure: nn.Structure{
 				InputNeurons:         3 * dymension * dymension,
-				HiddenNeuronsByLayer: []int{50, 100, 50},
+				HiddenNeuronsByLayer: hidden_layer,
 				OutputNeurons:        3,
 			},
-			ActivationFunc: func(v float64) float64 { return float64(dymension) / (1.0 + math.Exp(-v)) },
+			ActivationFuncName: activation,
 		},
 		),
 	})

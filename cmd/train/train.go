@@ -33,6 +33,8 @@ func kthBiggest(scores []float64, k int) float64 {
 
 func main() {
 	loadConfig()
+	hidden_layer := viper.GetIntSlice("HIDDEN_LAYER")
+	activation := viper.GetString("ACTIVATION")
 	populationSize := viper.GetInt("POPULATION_SIZE")
 	mutationRate := viper.GetFloat64("MUTATION_RATE")
 	stabilizationRate := viper.GetFloat64("STABLIZATION_RATE")
@@ -49,10 +51,10 @@ func main() {
 			Logic: nn.NewNeuralNetwork(nn.NeuralNetwork{
 				Structure: nn.Structure{
 					InputNeurons:         3 * dymension * dymension,
-					HiddenNeuronsByLayer: []int{50, 100, 50},
+					HiddenNeuronsByLayer: hidden_layer,
 					OutputNeurons:        3,
 				},
-				ActivationFunc: func(v float64) float64 { return float64(dymension) / (1.0 + math.Exp(-v)) },
+				ActivationFuncName: activation,
 			}),
 		})
 		agents[uuid.NewString()] = &agent

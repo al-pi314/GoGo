@@ -14,8 +14,9 @@ type Structure struct {
 }
 
 type NeuralNetwork struct {
-	Structure      Structure
-	ActivationFunc func(float64) float64
+	Structure          Structure
+	ActivationFuncName string
+	activation         func(float64) float64
 
 	wHiddenByLayer []*mat.Dense
 	bHiddenByLayer []*mat.Dense
@@ -25,6 +26,7 @@ type NeuralNetwork struct {
 }
 
 func NewNeuralNetwork(nn NeuralNetwork) *NeuralNetwork {
+	nn.activation = ActivationFunc(nn.ActivationFuncName)
 	nn.wHiddenByLayer = []*mat.Dense{}
 	nn.bHiddenByLayer = []*mat.Dense{}
 	randomise := [][]float64{}
@@ -67,7 +69,7 @@ func (nn *NeuralNetwork) Predict(input *mat.Dense) *mat.Dense {
 		return math.Max(0, v)
 	}
 	applyActivation := func(_, _ int, v float64) float64 {
-		return nn.ActivationFunc(v)
+		return nn.activation(v)
 	}
 
 	prev_activation := input
@@ -91,12 +93,13 @@ func (nn *NeuralNetwork) Predict(input *mat.Dense) *mat.Dense {
 
 func (nn *NeuralNetwork) Mutate(rate float64) *NeuralNetwork {
 	newNN := NeuralNetwork{
-		Structure:      nn.Structure,
-		ActivationFunc: nn.ActivationFunc,
-		wHiddenByLayer: []*mat.Dense{},
-		bHiddenByLayer: []*mat.Dense{},
-		wOut:           mat.NewDense(nn.wOut.RawMatrix().Rows, nn.wOut.RawMatrix().Cols, nil),
-		bOut:           mat.NewDense(nn.bOut.RawMatrix().Rows, nn.bOut.RawMatrix().Cols, nil),
+		Structure:          nn.Structure,
+		ActivationFuncName: nn.ActivationFuncName,
+		activation:         nn.activation,
+		wHiddenByLayer:     []*mat.Dense{},
+		bHiddenByLayer:     []*mat.Dense{},
+		wOut:               mat.NewDense(nn.wOut.RawMatrix().Rows, nn.wOut.RawMatrix().Cols, nil),
+		bOut:               mat.NewDense(nn.bOut.RawMatrix().Rows, nn.bOut.RawMatrix().Cols, nil),
 	}
 
 	mutateFunc := func(i int, j int, v float64) float64 {
