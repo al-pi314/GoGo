@@ -4,12 +4,12 @@ import "reflect"
 
 type GameState struct {
 	Board               [][]*bool
+	Moves               int
 	OpponentSkipped     bool `encode:"true"`
-	MyFailedMoves       int
-	BlackStones         int `encode:"true"`
-	WhiteStones         int `encode:"true"`
-	BlackStonesCaptured int `encode:"true"`
-	WhiteStonesCaptured int `encode:"true"`
+	BlackStones         int  `encode:"true"`
+	WhiteStones         int  `encode:"true"`
+	BlackStonesCaptured int  `encode:"true"`
+	WhiteStonesCaptured int  `encode:"true"`
 }
 
 func GameStateSize() int {

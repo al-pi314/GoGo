@@ -260,7 +260,6 @@ func (g *Game) Update() error {
 	}
 
 	skip, x, y := player.Place(g.gameState)
-	skip = skip || g.gameState.MyFailedMoves == 3
 	if skip || ((x != nil && y != nil) && g.placePiece(*x, *y, g.whiteToMove)) {
 		// consequitive skips end the game
 		if skip && g.gameState.OpponentSkipped {
@@ -278,10 +277,8 @@ func (g *Game) Update() error {
 		}
 		g.delay_lock = false
 		// change player to move
-		g.gameState.MyFailedMoves = 0
 		g.whiteToMove = !g.whiteToMove
-	} else if !player.IsHuman() {
-		g.gameState.MyFailedMoves++
+		g.gameState.Moves++
 	}
 	return nil
 }

@@ -11,6 +11,8 @@ type Agent struct {
 	StabilizationRate float64
 	MutationRate      float64
 	Logic             *nn.NeuralNetwork
+	SuggestedOnMove   int
+	SuggestedMoves    *MoveSuggestion
 }
 
 func NewAgent(p Agent) Agent {
@@ -79,14 +81,54 @@ func encodeState(state *GameState) *mat.Dense {
 	return mat.NewDense(1, len(raw), raw)
 }
 
-func interperate(output *mat.Dense, dymension int) (bool, *int, *int) {
-	if output == nil {
-		return false, nil, nil
+type MoveSuggestion struct {
+	X              int
+	Y              int
+	Effectivness   float64
+	NextSuggestion *MoveSuggestion
+}
+
+func (ms *MoveSuggestion) add(suggestion MoveSuggestion) MoveSuggestion {
+	// fix head
+	if ms.Effectivness < suggestion.Effectivness {
+		c := *ms
+		suggestion.NextSuggestion = &c
+		return suggestion
 	}
 
-	x := int(float64(dymension) * output.At(0, 1))
-	y := int(float64(dymension) * output.At(0, 1))
-	return output.At(0, 0) >= 0.5, &x, &y
+	// fix current
+	if ms.NextSuggestion == nil || ms.NextSuggestion.Effectivness < suggestion.Effectivness {
+		suggestion.NextSuggestion = ms.NextSuggestion
+		ms.NextSuggestion = &suggestion
+		return *ms
+	}
+
+	// fix recursively
+	ms.NextSuggestion.add(suggestion)
+	return *ms
+}
+
+func interperate(output *mat.Dense, dymension int) (bool, *MoveSuggestion) {
+	if output == nil {
+		return false, nil
+	}
+
+	suggestions := MoveSuggestion{
+		X:            0,
+		Y:            0,
+		Effectivness: output.At(0, 0),
+	}
+	for y := 0; y < dymension; y++ {
+		for x := 1; x < dymension; x++ {
+			suggestions = suggestions.add(MoveSuggestion{
+				X:            x,
+				Y:            y,
+				Effectivness: output.At(0, y*dymension+x),
+			})
+		}
+	}
+
+	return output.At(0, dymension*dymension) >= 0.5, &suggestions
 }
 
 func (p *Agent) Offsprint() *Agent {
@@ -102,6 +144,25 @@ func (p *Agent) Place(state *GameState) (bool, *int, *int) {
 		return false, nil, nil
 	}
 
-	result := p.Logic.Predict(encodeState(state))
-	return interperate(result, len(state.Board))
+	if p.SuggestedOnMove != state.Moves {
+		// refresh cached moves suggestions
+		var skip bool
+		result := p.Logic.Predict(encodeState(state))
+		skip, p.SuggestedMoves = interperate(result, len(state.Board))
+		if skip || p.SuggestedMoves == nil {
+			return true, nil, nil
+		}
+		p.SuggestedOnMove = state.Moves
+	}
+
+	// no more suggeste moves means no possible moves
+	if p.SuggestedMoves == nil {
+		return true, nil, nil
+	}
+
+	// pick best move from cached suggestions
+	bestMove := *p.SuggestedMoves
+	p.SuggestedMoves = bestMove.NextSuggestion
+
+	return false, &bestMove.X, &bestMove.Y
 }

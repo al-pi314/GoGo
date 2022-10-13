@@ -53,7 +53,7 @@ func main() {
 				Structure: nn.Structure{
 					InputNeurons:         3*dymension*dymension + gogo.GameStateSize(),
 					HiddenNeuronsByLayer: hidden_layer,
-					OutputNeurons:        3,
+					OutputNeurons:        dymension*dymension + 1,
 				},
 				ActivationFuncName: activation,
 			}),
