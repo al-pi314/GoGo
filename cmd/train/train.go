@@ -16,46 +16,42 @@ import (
 	"github.com/spf13/viper"
 )
 
-func loadConfig() {
+func loadConfig() *gogo.Config {
 	viper.SetEnvPrefix("X")
 	viper.SetConfigFile(".env")
 	viper.ReadInConfig()
-	rand.Seed(viper.GetInt64("RANDOM_SEED"))
-}
 
+	config := gogo.Config{}
+	viper.Unmarshal(&config)
+
+	rand.Seed(config.RandomSeed)
+	return &config
+}
 func main() {
-	loadConfig()
-	hidden_layer := viper.GetIntSlice("HIDDEN_LAYERS")
-	activation := viper.GetString("ACTIVATION")
-	populationSize := viper.GetInt("POPULATION_SIZE")
-	mutationRate := viper.GetFloat64("MUTATION_RATE")
-	stabilizationRate := viper.GetFloat64("STABLIZATION_RATE")
-	dymension := viper.GetInt("DYMENSION")
-	matches := viper.GetInt("MATCHES")
-	agentsFile := viper.GetString("AGENTS_FILE")
+	config := loadConfig()
 
 	// fill population
 	agents := map[string]*player.Agent{}
-	for len(agents) < populationSize {
+	for len(agents) < config.PopulationSize {
 		agent := player.NewAgent(player.Agent{
-			StabilizationRate: stabilizationRate,
-			MutationRate:      mutationRate,
+			StabilizationRate: config.StabilizationRate,
+			MutationRate:      config.MutationRate,
 			Logic: nn.NewNeuralNetwork(nn.NeuralNetwork{
 				Structure: nn.Structure{
-					InputNeurons:         3*dymension*dymension + gogo.GameStateSize(),
-					HiddenNeuronsByLayer: hidden_layer,
-					OutputNeurons:        dymension*dymension + 1,
+					InputNeurons:         3*config.Dymension*config.Dymension + gogo.GameStateSize(),
+					HiddenNeuronsByLayer: config.HiddenLayers,
+					OutputNeurons:        config.Dymension*config.Dymension + 1,
 				},
-				ActivationFuncName: activation,
+				ActivationFuncName: config.Activation,
 			}),
 		})
 		agents[uuid.NewString()] = &agent
 	}
 
 	var bestScore float64
-	for i := 0; i <= matches; i++ {
+	for i := 0; i <= config.Matches; i++ {
 		fmt.Printf("Starting match %d\n", i+1)
-		agents, bestScore = playTurnament(agents, dymension)
+		agents, bestScore = playTurnament(agents, config.Dymension)
 		fmt.Printf("Match %d finished by %d players. Best Score %.2f\n", i+1, len(agents), bestScore)
 	}
 
@@ -69,7 +65,7 @@ func main() {
 		log.Fatal(errors.Wrap(err, "failed to masthal agents"))
 	}
 
-	file, err := os.OpenFile(agentsFile, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0755)
+	file, err := os.OpenFile(config.AgentsFile, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0755)
 	if err != nil {
 		log.Fatal(errors.Wrap(err, "failed to open agents file"))
 	}

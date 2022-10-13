@@ -12,41 +12,41 @@ import (
 	"github.com/spf13/viper"
 )
 
-func loadConfig() {
+func loadConfig() *gogo.Config {
 	viper.SetEnvPrefix("X")
 	viper.SetConfigFile(".env")
 	viper.ReadInConfig()
-	rand.Seed(viper.GetInt64("RANDOM_SEED"))
+
+	config := gogo.Config{}
+	viper.Unmarshal(&config)
+
+	rand.Seed(config.RandomSeed)
+	return &config
 }
 
 func main() {
-	loadConfig()
-	squareSize := viper.GetInt("SQUARE_SIZE")
-	borderSize := viper.GetInt("BORDER_SIZE")
-	dymension := viper.GetInt("DYMENSION")
-	activation := viper.GetString("ACTIVATION")
-	hidden_layer := viper.GetIntSlice("HIDDEN_LAYER")
+	config := loadConfig()
 
 	whitePlayer := player.NewHuman(player.Human{
-		XSnap: squareSize + borderSize,
-		YSnap: squareSize + borderSize,
+		XSnap: config.SquareSize + config.BorderSize,
+		YSnap: config.SquareSize + config.BorderSize,
 	})
 	blackPlayer := player.NewAgent(player.Agent{
 		Logic: nn.NewNeuralNetwork(nn.NeuralNetwork{
 			Structure: nn.Structure{
-				InputNeurons:         3*dymension*dymension + gogo.GameStateSize(),
-				HiddenNeuronsByLayer: hidden_layer,
-				OutputNeurons:        dymension*dymension + 1,
+				InputNeurons:         3*config.Dymension*config.Dymension + gogo.GameStateSize(),
+				HiddenNeuronsByLayer: config.HiddenLayers,
+				OutputNeurons:        config.Dymension*config.Dymension + 1,
 			},
-			ActivationFuncName: activation,
+			ActivationFuncName: config.Activation,
 		},
 		),
 	})
 
 	game := game.NewGame(game.Game{
-		Dymension:   dymension,
-		SquareSize:  squareSize,
-		BorderSize:  borderSize,
+		Dymension:   config.Dymension,
+		SquareSize:  config.SquareSize,
+		BorderSize:  config.BorderSize,
 		WhitePlayer: &whitePlayer,
 		BlackPlayer: &blackPlayer,
 	})
