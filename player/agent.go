@@ -15,6 +15,10 @@ func NewAgent(p Agent) Agent {
 	return p
 }
 
+func (p *Agent) IsHuman() bool {
+	return false
+}
+
 func encodeBoard(board [][]*bool) *mat.Dense {
 	raw := []float64{}
 	addEqualityResult := func(a, b *bool) {

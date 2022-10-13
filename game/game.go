@@ -282,7 +282,7 @@ func (g *Game) Update() error {
 		// change player to move
 		g.failedMoves = 0
 		g.whiteToMove = !g.whiteToMove
-	} else {
+	} else if !player.IsHuman() {
 		g.failedMoves++
 	}
 	return nil
