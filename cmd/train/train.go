@@ -4,10 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"math"
 	"math/rand"
 	"os"
-	"sort"
 
 	"github.com/al-pi314/gogo"
 	"github.com/al-pi314/gogo/game"
@@ -25,16 +23,9 @@ func loadConfig() {
 	rand.Seed(viper.GetInt64("RANDOM_SEED"))
 }
 
-func kthBiggest(scores []float64, k int) float64 {
-	sort.Slice(scores, func(i, j int) bool {
-		return scores[i] <= scores[j]
-	})
-	return scores[k]
-}
-
 func main() {
 	loadConfig()
-	hidden_layer := viper.GetIntSlice("HIDDEN_LAYER")
+	hidden_layer := viper.GetIntSlice("HIDDEN_LAYERS")
 	activation := viper.GetString("ACTIVATION")
 	populationSize := viper.GetInt("POPULATION_SIZE")
 	mutationRate := viper.GetFloat64("MUTATION_RATE")
@@ -64,7 +55,7 @@ func main() {
 	var bestScore float64
 	for i := 0; i <= matches; i++ {
 		fmt.Printf("Starting match %d\n", i+1)
-		agents, bestScore = match(agents, dymension)
+		agents, bestScore = playTurnament(agents, dymension)
 		fmt.Printf("Match %d finished by %d players. Best Score %.2f\n", i+1, len(agents), bestScore)
 	}
 
@@ -78,57 +69,94 @@ func main() {
 		log.Fatal(errors.Wrap(err, "failed to masthal agents"))
 	}
 
-	file, err := os.Open(agentsFile)
+	file, err := os.OpenFile(agentsFile, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0755)
 	if err != nil {
 		log.Fatal(errors.Wrap(err, "failed to open agents file"))
 	}
 	defer file.Close()
 
-	file.Write(data)
+	_, err = file.Write(data)
+	if err != nil {
+		log.Fatal(errors.Wrap(err, "failed to write to file"))
+	}
+	fmt.Println(file.Fd())
 }
 
-func match(agents map[string]*player.Agent, dymension int) (map[string]*player.Agent, float64) {
-	// play games among players
-	gamesScore := map[string]float64{}
+func playTurnament(agents map[string]*player.Agent, dymension int) (map[string]*player.Agent, float64) {
+	gameScores := map[string]float64{}
 	for blackPlayerID, blackPlayer := range agents {
 		for whitePlayerID, whitePlayer := range agents {
 			if blackPlayerID == whitePlayerID {
 				continue
 			}
-			// create new game
-			g := game.NewGame(game.Game{
+			score := playGame(game.Game{
 				Dymension:   dymension,
 				WhitePlayer: whitePlayer,
 				BlackPlayer: blackPlayer,
 			})
-			// play game
-			for g.Update() == nil {
-			}
-			// add score to the winner
-			winner := blackPlayerID
-			score := g.Score() + 0.5
 			if score >= 0 {
-				winner = whitePlayerID
+				gameScores[whitePlayerID] += score
+			} else {
+				gameScores[blackPlayerID] += (-score)
 			}
-			gamesScore[winner] += math.Abs(score)
+
 		}
 	}
-	// find best player
-	scores := make([]float64, 0, len(gamesScore))
-	for _, v := range gamesScore {
-		scores = append(scores, v)
+	return findBest(agents, gameScores)
+}
+
+func playGame(newGame game.Game) float64 {
+	// create new game
+	g := game.NewGame(newGame)
+	// play game
+	for g.Update() == nil {
 	}
-	limit := kthBiggest(scores, len(scores)/2)
+	// return adjusted score
+	return g.Score()
+}
+
+type PlayerPreformanceLinked = gogo.LinkedList[PlayerPreformance]
+
+type PlayerPreformance struct {
+	Agent *player.Agent
+	Score float64
+}
+
+func (pp PlayerPreformance) Less(other interface{}) bool {
+	switch otherType := other.(type) {
+	case PlayerPreformance:
+		return pp.Score < otherType.Score
+	}
+	return false
+
+}
+
+func findBest(agents map[string]*player.Agent, gameScores map[string]float64) (map[string]*player.Agent, float64) {
+	var bestPlayer PlayerPreformanceLinked
+	var bestPlayerSet bool
+	for playerID, score := range gameScores {
+		if !bestPlayerSet {
+			bestPlayer = PlayerPreformanceLinked{
+				Element: PlayerPreformance{
+					Agent: agents[playerID],
+					Score: score,
+				},
+			}
+			continue
+		}
+		bestPlayer.Add(PlayerPreformance{
+			Agent: agents[playerID],
+			Score: score,
+		})
+	}
 
 	newAgents := map[string]*player.Agent{}
-	bestScore := 0.0
-	for k, v := range gamesScore {
-		if v >= limit {
-			newAgents[uuid.NewString()] = agents[k].Offsprint()
-			newAgents[uuid.NewString()] = agents[k].Offsprint()
-		}
-		if v >= bestScore {
-			bestScore = v
+	bestScore := bestPlayer.Element.Score
+	for i := 0; i < len(agents)/2; i++ {
+		newAgents[uuid.NewString()] = bestPlayer.Element.Agent.Offsprint()
+		newAgents[uuid.NewString()] = bestPlayer.Element.Agent.Offsprint()
+		if bestPlayer.Next != nil {
+			bestPlayer = *bestPlayer.Next
 		}
 	}
 	return newAgents, bestScore
