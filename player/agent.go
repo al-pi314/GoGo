@@ -73,15 +73,16 @@ func encodeState(state *GameState) *mat.Dense {
 
 		raw = append(raw, 0)
 	}
-	boolFalse := false
-	boolTrue := true
+
+	isMyPiece := state.Moves%2 == 1 // on even moves my pieces are black = false
+	isNotMyPiece := !isMyPiece      // oponents pieces are opposite color
 
 	// encode game state
 	for i := range state.Board {
 		for j := range state.Board[i] {
 			addEqualityResult(state.Board[i][j], nil)
-			addEqualityResult(state.Board[i][j], &boolFalse)
-			addEqualityResult(state.Board[i][j], &boolTrue)
+			addEqualityResult(state.Board[i][j], &isMyPiece)
+			addEqualityResult(state.Board[i][j], &isNotMyPiece)
 		}
 	}
 
