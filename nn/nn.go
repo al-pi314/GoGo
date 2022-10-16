@@ -50,12 +50,11 @@ func (MatDense *MatDense) UnmarshalJSON(b []byte) error {
 		data = append(data, v.(float64))
 	}
 
-	MatDense.M = mat.NewDense(marshalable["rows"].(int), marshalable["cols"].(int), data)
+	MatDense.M = mat.NewDense(int(marshalable["rows"].(float64)), int(marshalable["cols"].(float64)), data)
 	return nil
 }
 
 func NewNeuralNetwork(nn NeuralNetwork) *NeuralNetwork {
-	nn.activation = ActivationFunc(nn.ActivationFuncName)
 	nn.WHiddenByLayer = []MatDense{}
 	nn.BHiddenByLayer = []MatDense{}
 	nn.WOut = MatDense{}
@@ -86,7 +85,12 @@ func NewNeuralNetwork(nn NeuralNetwork) *NeuralNetwork {
 		}
 	}
 
+	nn.SetActivationFunc()
 	return &nn
+}
+
+func (nn *NeuralNetwork) SetActivationFunc() {
+	nn.activation = ActivationFunc(nn.ActivationFuncName)
 }
 
 func (nn *NeuralNetwork) Predict(input *mat.Dense) *mat.Dense {
@@ -134,7 +138,7 @@ func (nn *NeuralNetwork) Mutate(rate float64) *NeuralNetwork {
 	}
 
 	mutateFunc := func(i int, j int, v float64) float64 {
-		if rand.Float64() > rate {
+		if rand.Float64() < rate {
 			return -1 + 2*rand.Float64()
 		}
 		return v

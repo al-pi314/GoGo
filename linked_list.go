@@ -20,7 +20,7 @@ func (ll LinkedList[C]) Add(element C) LinkedList[C] {
 	}
 
 	// fix current
-	if ll.Next == nil || ll.Element.Less(element) {
+	if ll.Next == nil || ll.Next.Element.Less(element) {
 		elementLinkedList := LinkedList[C]{
 			Element: element,
 			Next:    ll.Next,
@@ -30,6 +30,7 @@ func (ll LinkedList[C]) Add(element C) LinkedList[C] {
 	}
 
 	// fix recursively
-	ll.Next.Add(element)
+	n := ll.Next.Add(element)
+	ll.Next = &n
 	return ll
 }

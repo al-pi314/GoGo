@@ -19,10 +19,9 @@ type Agent struct {
 type MoveSuggestionLinked = gogo.LinkedList[MoveSuggestion]
 
 type MoveSuggestion struct {
-	X              int
-	Y              int
-	Effectivness   float64
-	NextSuggestion *MoveSuggestion
+	X            int
+	Y            int
+	Effectivness float64
 }
 
 func (ms MoveSuggestion) Less(other interface{}) bool {
@@ -34,6 +33,8 @@ func (ms MoveSuggestion) Less(other interface{}) bool {
 }
 
 func NewAgent(p Agent) Agent {
+	p.SuggestedOnMove = -1
+	p.Logic.SetActivationFunc()
 	return p
 }
 
@@ -122,15 +123,16 @@ func interperate(output *mat.Dense, dymension int) (bool, *MoveSuggestionLinked)
 		}
 	}
 
-	return output.At(0, dymension*dymension) >= 0.5, &suggestions
+	return output.At(0, dymension*dymension) >= 0.9, &suggestions
 }
 
 func (p *Agent) Offsprint() *Agent {
-	return &Agent{
+	na := NewAgent(Agent{
 		StabilizationRate: p.StabilizationRate,
 		MutationRate:      (1 - p.StabilizationRate) * p.MutationRate,
 		Logic:             p.Logic.Mutate(p.MutationRate),
-	}
+	})
+	return &na
 }
 
 func (p *Agent) Place(state *GameState) (bool, *int, *int) {
