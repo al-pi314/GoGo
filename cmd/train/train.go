@@ -27,6 +27,7 @@ func loadConfig() *gogo.Config {
 	rand.Seed(config.RandomSeed)
 	return &config
 }
+
 func main() {
 	config := loadConfig()
 
@@ -62,12 +63,16 @@ func main() {
 
 	data, err := json.Marshal(agentsList)
 	if err != nil {
-		log.Fatal(errors.Wrap(err, "failed to masthal agents"))
+		log.Fatal(errors.Wrap(err, "failed to marshal agents"))
 	}
 
 	file, err := os.OpenFile(config.AgentsFile, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0755)
 	if err != nil {
-		log.Fatal(errors.Wrap(err, "failed to open agents file"))
+		log.Print(errors.Wrap(err, "failed to open env agents file"))
+		file, err = os.OpenFile("./agents.json", os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0755)
+		if err != nil {
+			log.Fatal(errors.Wrap(err, "failed to open or create ./agents file"))
+		}
 	}
 	defer file.Close()
 
@@ -90,12 +95,9 @@ func playTurnament(agents map[string]*player.Agent, dymension int) (map[string]*
 				WhitePlayer: whitePlayer,
 				BlackPlayer: blackPlayer,
 			})
-			if score >= 0 {
-				gameScores[whitePlayerID] += score
-			} else {
-				gameScores[blackPlayerID] += (-score)
-			}
 
+			gameScores[whitePlayerID] += score
+			gameScores[blackPlayerID] += (-score)
 		}
 	}
 	return findBest(agents, gameScores)
@@ -130,6 +132,7 @@ func (pp PlayerPreformance) Less(other interface{}) bool {
 func findBest(agents map[string]*player.Agent, gameScores map[string]float64) (map[string]*player.Agent, float64) {
 	var bestPlayer PlayerPreformanceLinked
 	var bestPlayerSet bool
+	avgScore := 0.0
 	for playerID, score := range gameScores {
 		if !bestPlayerSet {
 			bestPlayer = PlayerPreformanceLinked{
@@ -138,16 +141,18 @@ func findBest(agents map[string]*player.Agent, gameScores map[string]float64) (m
 					Score: score,
 				},
 			}
+			bestPlayerSet = true
 			continue
 		}
-		bestPlayer.Add(PlayerPreformance{
+		bestPlayer = bestPlayer.Add(PlayerPreformance{
 			Agent: agents[playerID],
 			Score: score,
 		})
+		avgScore += score
 	}
+	avgScore /= float64(len(gameScores))
 
 	newAgents := map[string]*player.Agent{}
-	bestScore := bestPlayer.Element.Score
 	for i := 0; i < len(agents)/2; i++ {
 		newAgents[uuid.NewString()] = bestPlayer.Element.Agent.Offsprint()
 		newAgents[uuid.NewString()] = bestPlayer.Element.Agent.Offsprint()
@@ -155,5 +160,5 @@ func findBest(agents map[string]*player.Agent, gameScores map[string]float64) (m
 			bestPlayer = *bestPlayer.Next
 		}
 	}
-	return newAgents, bestScore
+	return newAgents, avgScore
 }
