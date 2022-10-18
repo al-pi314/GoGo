@@ -156,8 +156,8 @@ func (nn *NeuralNetwork) Mutate(rate float64) *NeuralNetwork {
 		newBiases.Apply(mutateFunc, layer.M)
 	}
 
-	nn.WOut.M.Apply(mutateFunc, newNN.WOut.M)
-	nn.BOut.M.Apply(mutateFunc, newNN.BOut.M)
+	newNN.WOut.M.Apply(mutateFunc, newNN.WOut.M)
+	newNN.BOut.M.Apply(mutateFunc, newNN.BOut.M)
 
 	return &newNN
 }
