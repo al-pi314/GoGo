@@ -50,11 +50,11 @@ func main() {
 		agents[uuid.NewString()] = &agent
 	}
 
-	var bestScore float64
+	var avgScore float64
 	for i := 0; i <= config.Matches; i++ {
-		fmt.Printf("Starting match %d\n", i+1)
-		agents, bestScore = playTurnament(agents, config.Dymension)
-		fmt.Printf("Match %d finished by %d players. Best Score %.2f\n", i+1, len(agents), bestScore)
+		// fmt.Printf("Starting match %d\n", i+1)
+		agents, avgScore = playTurnament(agents, config.Dymension)
+		fmt.Printf("Match %d finished by %d players. Avg per move score %.2f\n", i+1, len(agents), avgScore)
 	}
 
 	agentsList := make([]*player.Agent, 0, len(agents))
@@ -154,13 +154,13 @@ func findBest(agents map[string]*player.Agent, gameScores map[string]float64) (m
 		if score > bestScore {
 			bestScore = score
 		}
-		fmt.Printf("current score %f; best score %f; avf score %f\n", score, bestScore, avgScore)
+		// fmt.Printf("current score %f; best score %f; avf score %f\n", score, bestScore, avgScore)
 	}
 	avgScore /= float64(len(gameScores))
 
 	newAgents := map[string]*player.Agent{}
 	for i := 0; i < len(agents)/2; i++ {
-		fmt.Printf("choosing agent with score %f\n", bestPlayer.Element.Score)
+		// fmt.Printf("choosing agent with score %f\n", bestPlayer.Element.Score)
 		newAgents[uuid.NewString()] = bestPlayer.Element.Agent.Offsprint()
 		newAgents[uuid.NewString()] = bestPlayer.Element.Agent.Offsprint()
 		if bestPlayer.Next != nil {
