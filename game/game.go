@@ -224,6 +224,11 @@ func (g *Game) caputreOpponent(x, y int, white bool) bool {
 	return len(toRemove) != 0
 }
 
+// Moves returns number of moves palyed by players.
+func (g *Game) Moves() int {
+	return g.gameState.Moves
+}
+
 // Score calculates game score based on the current position.
 func (g *Game) Score() float64 {
 	checked := map[Cordinate]bool{}

@@ -140,6 +140,10 @@ func (p *Agent) Place(state *GameState) (bool, *int, *int) {
 		return false, nil, nil
 	}
 
+	if state.Moves > 1000 {
+		return true, nil, nil
+	}
+
 	if p.SuggestedOnMove != state.Moves {
 		// refresh cached moves suggestions
 		var skip bool

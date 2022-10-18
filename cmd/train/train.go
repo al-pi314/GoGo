@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math"
 	"math/rand"
 	"os"
 
@@ -110,7 +111,7 @@ func playGame(newGame game.Game) float64 {
 	for g.Update() == nil {
 	}
 	// return adjusted score
-	return g.Score()
+	return g.Score() / math.Max(1, float64(g.Moves()))
 }
 
 type PlayerPreformanceLinked = gogo.LinkedList[PlayerPreformance]
@@ -133,6 +134,7 @@ func findBest(agents map[string]*player.Agent, gameScores map[string]float64) (m
 	var bestPlayer PlayerPreformanceLinked
 	var bestPlayerSet bool
 	avgScore := 0.0
+	bestScore := 0.0
 	for playerID, score := range gameScores {
 		if !bestPlayerSet {
 			bestPlayer = PlayerPreformanceLinked{
@@ -149,11 +151,16 @@ func findBest(agents map[string]*player.Agent, gameScores map[string]float64) (m
 			Score: score,
 		})
 		avgScore += score
+		if score > bestScore {
+			bestScore = score
+		}
+		fmt.Printf("current score %f; best score %f; avf score %f\n", score, bestScore, avgScore)
 	}
 	avgScore /= float64(len(gameScores))
 
 	newAgents := map[string]*player.Agent{}
 	for i := 0; i < len(agents)/2; i++ {
+		fmt.Printf("choosing agent with score %f\n", bestPlayer.Element.Score)
 		newAgents[uuid.NewString()] = bestPlayer.Element.Agent.Offsprint()
 		newAgents[uuid.NewString()] = bestPlayer.Element.Agent.Offsprint()
 		if bestPlayer.Next != nil {
