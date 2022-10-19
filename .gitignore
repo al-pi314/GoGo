@@ -4,3 +4,6 @@
 # builds
 .env
 *.exe
+
+# populations
+./populations/*.json

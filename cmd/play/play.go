@@ -78,7 +78,7 @@ func main() {
 
 	w := flag.String("white", "human", "set to 'human' or to 'agent'")
 	b := flag.String("black", "human", "set to 'human' or to 'agent'")
-	a := flag.String("agents", config.AgentsFile, "agents file to use for agent players")
+	a := flag.String("agents", config.OutputFile, "agents file to use for agent players")
 	flag.Parse()
 
 	agents := loadAgents(a)

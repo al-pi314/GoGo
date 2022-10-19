@@ -1,19 +1,16 @@
 package main
 
 import (
-	"encoding/json"
+	"flag"
 	"fmt"
 	"log"
-	"math"
 	"math/rand"
 	"os"
+	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/al-pi314/gogo"
-	"github.com/al-pi314/gogo/game"
-	"github.com/al-pi314/gogo/nn"
-	"github.com/al-pi314/gogo/player"
-	"github.com/google/uuid"
-	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 )
 
@@ -23,149 +20,72 @@ func loadConfig() *gogo.Config {
 	viper.ReadInConfig()
 
 	config := gogo.Config{}
-	viper.Unmarshal(&config)
+	err := viper.Unmarshal(&config)
+	if err != nil {
+		log.Fatal(errors.Wrap(err, "viper could not unmarshall enviorment variables"))
+	}
 
 	rand.Seed(config.RandomSeed)
 	return &config
 }
 
+func confirmFile(filePath string) *os.File {
+	if _, err := os.Stat(filePath); !errors.Is(err, os.ErrNotExist) {
+		fmt.Printf("...output %s file already exists! File will be overwritten (3s to cancel).\n", filePath)
+		time.Sleep(3 * time.Second)
+	}
+	file, err := os.OpenFile(filePath, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0755)
+	if err != nil {
+		return nil
+	}
+	return file
+}
+
+func isArgSet(arg *string) bool {
+	return arg != nil && *arg != ""
+}
+
 func main() {
+	fmt.Println("...starting training")
 	config := loadConfig()
 
-	// fill population
-	agents := map[string]*player.Agent{}
-	for len(agents) < config.PopulationSize {
-		agent := player.NewAgent(player.Agent{
-			StabilizationRate: config.StabilizationRate,
-			MutationRate:      config.MutationRate,
-			Logic: nn.NewNeuralNetwork(nn.NeuralNetwork{
-				Structure: nn.Structure{
-					InputNeurons:         3*config.Dymension*config.Dymension + gogo.GameStateSize(),
-					HiddenNeuronsByLayer: config.HiddenLayers,
-					OutputNeurons:        config.Dymension*config.Dymension + 1,
-				},
-				ActivationFuncName: config.Activation,
-			}),
-		})
-		agents[uuid.NewString()] = &agent
+	populationFile := flag.String("population", "", "path to population.json file containing a population")
+	outputFile := flag.String("output", "", "path to output file after population training is done")
+	flag.Parse()
+
+	// select output file
+	if isArgSet(outputFile) {
+		config.OutputFile = *outputFile
+		fmt.Println("...using output file provided in command line")
 	}
+	fmt.Printf("...output file is set to %s\n", config.OutputFile)
 
-	var avgScore float64
-	for i := 0; i <= config.Matches; i++ {
-		// fmt.Printf("Starting match %d\n", i+1)
-		agents, avgScore = playTurnament(agents, config.Dymension)
-		fmt.Printf("Match %d finished by %d players. Avg per move score %.2f\n", i+1, len(agents), avgScore)
+	// confirm output file
+	file := confirmFile(config.OutputFile)
+	if file == nil {
+		log.Fatal("provided output file cannot be accessed or created!")
 	}
+	fmt.Println("...output file confirmed")
 
-	agentsList := make([]*player.Agent, 0, len(agents))
-	for _, v := range agents {
-		agentsList = append(agentsList, v)
+	// create population
+	population := NewPopulation(config)
+	fmt.Println("...population created")
+	if isArgSet(populationFile) {
+		population.LoadFromFile(populationFile)
+		fmt.Println("...population overwritten from file")
 	}
+	population.OutputFileName = config.OutputFile
 
-	data, err := json.Marshal(agentsList)
-	if err != nil {
-		log.Fatal(errors.Wrap(err, "failed to marshal agents"))
-	}
+	// test save population
+	population.Save()
+	fmt.Println("...test save completed (check output file!)")
 
-	file, err := os.OpenFile(config.AgentsFile, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0755)
-	if err != nil {
-		log.Print(errors.Wrap(err, "failed to open env agents file"))
-		file, err = os.OpenFile("./agents.json", os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0755)
-		if err != nil {
-			log.Fatal(errors.Wrap(err, "failed to open or create ./agents file"))
-		}
-	}
-	defer file.Close()
+	// train population
+	population.Train(config.Matches, config.SaveInterval, file)
+	fmt.Println("...training completed")
 
-	_, err = file.Write(data)
-	if err != nil {
-		log.Fatal(errors.Wrap(err, "failed to write to file"))
-	}
-	fmt.Println(file.Fd())
-}
-
-func playTurnament(agents map[string]*player.Agent, dymension int) (map[string]*player.Agent, float64) {
-	gameScores := map[string]float64{}
-	for blackPlayerID, blackPlayer := range agents {
-		for whitePlayerID, whitePlayer := range agents {
-			if blackPlayerID == whitePlayerID {
-				continue
-			}
-			score := playGame(game.Game{
-				Dymension:   dymension,
-				WhitePlayer: whitePlayer,
-				BlackPlayer: blackPlayer,
-			})
-
-			gameScores[whitePlayerID] += score
-			gameScores[blackPlayerID] += (-score)
-		}
-	}
-	return findBest(agents, gameScores)
-}
-
-func playGame(newGame game.Game) float64 {
-	// create new game
-	g := game.NewGame(newGame)
-	// play game
-	for g.Update() == nil {
-	}
-	// return adjusted score
-	return g.Score() / math.Max(1, float64(g.Moves()))
-}
-
-type PlayerPreformanceLinked = gogo.LinkedList[PlayerPreformance]
-
-type PlayerPreformance struct {
-	Agent *player.Agent
-	Score float64
-}
-
-func (pp PlayerPreformance) Less(other interface{}) bool {
-	switch otherType := other.(type) {
-	case PlayerPreformance:
-		return pp.Score < otherType.Score
-	}
-	return false
-
-}
-
-func findBest(agents map[string]*player.Agent, gameScores map[string]float64) (map[string]*player.Agent, float64) {
-	var bestPlayer PlayerPreformanceLinked
-	var bestPlayerSet bool
-	avgScore := 0.0
-	bestScore := 0.0
-	for playerID, score := range gameScores {
-		if !bestPlayerSet {
-			bestPlayer = PlayerPreformanceLinked{
-				Element: PlayerPreformance{
-					Agent: agents[playerID],
-					Score: score,
-				},
-			}
-			bestPlayerSet = true
-			continue
-		}
-		bestPlayer = bestPlayer.Add(PlayerPreformance{
-			Agent: agents[playerID],
-			Score: score,
-		})
-		avgScore += score
-		if score > bestScore {
-			bestScore = score
-		}
-		// fmt.Printf("current score %f; best score %f; avf score %f\n", score, bestScore, avgScore)
-	}
-	avgScore /= float64(len(gameScores))
-
-	newAgents := map[string]*player.Agent{}
-	for i := 0; i < len(agents)/2; i++ {
-		// fmt.Printf("choosing agent with score %f\n", bestPlayer.Element.Score)
-		newAgents[uuid.NewString()] = bestPlayer.Element.Agent.Offsprint()
-		newAgents[uuid.NewString()] = bestPlayer.Element.Agent.Offsprint()
-		if bestPlayer.Next != nil {
-			bestPlayer = *bestPlayer.Next
-		}
-	}
-	return newAgents, avgScore
+	// save population
+	population.Save()
+	file.Close()
+	fmt.Println("...last population saved - finished!")
 }

@@ -35,6 +35,9 @@ func (ms MoveSuggestion) Less(other interface{}) bool {
 func NewAgent(p Agent) Agent {
 	p.SuggestedOnMove = -1
 	p.Logic.SetActivationFunc()
+	if p.MutationRate <= 0.0001 {
+		p.MutationRate = 0.0001
+	}
 	return p
 }
 

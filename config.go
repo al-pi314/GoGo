@@ -18,5 +18,6 @@ type Config struct {
 	MutationRate      float64 `mapstructure:"mutation_rate"`
 	StabilizationRate float64 `mapstructure:"stabilization_rate"`
 	Matches           int     `mapstructure:"matches"`
-	AgentsFile        string  `mapstructure:"agents_file"`
+	SaveInterval      int     `mapstructure:"save_interval"`
+	OutputFile        string  `mapstructure:"output_file"`
 }
