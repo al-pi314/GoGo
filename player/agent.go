@@ -111,13 +111,13 @@ func interperate(output *mat.Dense, dymension int) (bool, *MoveSuggestionLinked)
 
 	suggestions := MoveSuggestionLinked{
 		Element: MoveSuggestion{
-			X:            0,
-			Y:            0,
-			Effectivness: output.At(0, 0),
+			X:            -1,
+			Y:            -1,
+			Effectivness: -1,
 		},
 	}
 	for y := 0; y < dymension; y++ {
-		for x := 1; x < dymension; x++ {
+		for x := 0; x < dymension; x++ {
 			suggestions = suggestions.Add(MoveSuggestion{
 				X:            x,
 				Y:            y,
