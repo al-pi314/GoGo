@@ -130,7 +130,7 @@ func (p *Population) Save() {
 func (p *Population) Train(rounds int, saveInterval int, file *os.File) {
 	for i := 0; i < rounds; i++ {
 		s := time.Now().UnixMilli()
-		fmt.Printf("starting round %d\n", i)
+		fmt.Printf("starting round (population age %d) %d\n", p.Age, i)
 		p.playMatches()
 		p.fitnessSelection()
 		p.Age++
