@@ -11,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/al-pi314/gogo"
+	"github.com/al-pi314/gogo/population"
 	"github.com/spf13/viper"
 )
 
@@ -68,7 +69,7 @@ func main() {
 	fmt.Println("...output file confirmed")
 
 	// create population
-	population := NewPopulation(config)
+	population := population.NewPopulation(config)
 	fmt.Println("...population created")
 	if isArgSet(populationFile) {
 		population.LoadFromFile(populationFile)

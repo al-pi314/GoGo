@@ -1,18 +1,16 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"log"
 	"math/rand"
-	"os"
 
 	"github.com/al-pi314/gogo"
 	"github.com/al-pi314/gogo/game"
 	"github.com/al-pi314/gogo/nn"
 	"github.com/al-pi314/gogo/player"
+	"github.com/al-pi314/gogo/population"
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 )
 
@@ -28,28 +26,9 @@ func loadConfig() *gogo.Config {
 	return &config
 }
 
-func loadAgents(a *string) []player.Agent {
-	if a == nil {
-		return nil
-	}
-
-	data, err := os.ReadFile(*a)
-	if err != nil {
-		log.Print(errors.Wrap(err, "invalid agents file provided"))
-		return nil
-	}
-	agents := []player.Agent{}
-	err = json.Unmarshal(data, &agents)
-	if err != nil {
-		log.Print(errors.Wrap(err, "invalid file structure"))
-		return nil
-	}
-	return agents
-}
-
-func createPlayer(config *gogo.Config, agents []player.Agent, t *string) player.Player {
+func createPlayer(config *gogo.Config, population *population.Population, t *string) player.Player {
 	if *t == "agent" {
-		if len(agents) == 0 {
+		if len(population.Enteties) == 0 {
 			p := player.NewAgent(player.Agent{
 				Logic: nn.NewNeuralNetwork(nn.NeuralNetwork{
 					Structure: nn.Structure{
@@ -63,7 +42,7 @@ func createPlayer(config *gogo.Config, agents []player.Agent, t *string) player.
 			})
 			return &p
 		}
-		p := player.NewAgent(agents[rand.Intn(len(agents))])
+		p := player.NewAgent(*population.Enteties[0].Agent)
 		return &p
 	}
 	p := player.NewHuman(player.Human{
@@ -81,9 +60,12 @@ func main() {
 	a := flag.String("agents", config.OutputFile, "agents file to use for agent players")
 	flag.Parse()
 
-	agents := loadAgents(a)
-	whitePlayer := createPlayer(config, agents, w)
-	blackPlayer := createPlayer(config, agents, b)
+	population := population.NewPopulation(config)
+	if a != nil && *a != "" {
+		population.LoadFromFile(a)
+	}
+	whitePlayer := createPlayer(config, population, w)
+	blackPlayer := createPlayer(config, population, b)
 
 	game := game.NewGame(game.Game{
 		Dymension:   config.Dymension,

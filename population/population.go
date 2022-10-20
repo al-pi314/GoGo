@@ -1,4 +1,4 @@
-package main
+package population
 
 import (
 	"encoding/json"
@@ -71,21 +71,20 @@ func (p *Population) LoadFromFile(filePath *string) bool {
 		log.Print(errors.Wrap(err, "invalid agents file provided"))
 		return false
 	}
-	agents := []*player.Agent{}
-	err = json.Unmarshal(data, &agents)
+	saveData := TrainingSave{}
+	err = json.Unmarshal(data, &saveData)
 	if err != nil {
 		log.Print(errors.Wrap(err, "invalid file structure"))
 		return false
 	}
 
-	p.Enteties = []*Entety{}
-	p.Size = 0
-	for _, agent := range agents {
-		p.AddEntety(&Entety{
-			Agent: agent,
-		})
+	for _, e := range saveData.Population.Enteties {
+		agent := player.NewAgent(*e.Agent)
+		e.Agent = &agent
 	}
 
+	fmt.Printf("...loaded population from file (population saved at %s)\n", saveData.Time.String())
+	*p = *saveData.Population
 	return true
 }
 
