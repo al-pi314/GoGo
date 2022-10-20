@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"image/color"
+	"time"
 
 	"github.com/al-pi314/gogo"
 	"github.com/al-pi314/gogo/player"
@@ -19,11 +20,12 @@ type Cordinate struct {
 }
 
 type Game struct {
-	Dymension   int
-	SquareSize  int
-	BorderSize  int
-	WhitePlayer player.Player
-	BlackPlayer player.Player
+	Dymension      int
+	SquareSize     int
+	BorderSize     int
+	WhitePlayer    player.Player
+	BlackPlayer    player.Player
+	AgentMoveDelay *int
 
 	active      bool
 	whiteToMove bool
@@ -260,8 +262,10 @@ func (g *Game) Update() error {
 	}
 
 	player := g.WhitePlayer
+	opponent := g.BlackPlayer
 	if !g.whiteToMove {
 		player = g.BlackPlayer
+		opponent = g.WhitePlayer
 	}
 
 	skip, x, y := player.Place(g.gameState)
@@ -284,6 +288,9 @@ func (g *Game) Update() error {
 		// change player to move
 		g.whiteToMove = !g.whiteToMove
 		g.gameState.Moves++
+		if !opponent.IsHuman() && g.AgentMoveDelay != nil {
+			time.Sleep(time.Duration(*g.AgentMoveDelay) * time.Millisecond)
+		}
 	}
 	return nil
 }

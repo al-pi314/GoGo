@@ -10,8 +10,8 @@ type Human struct {
 	YSnap int
 }
 
-func NewHuman(p Human) Human {
-	return p
+func NewHuman(p Human) *Human {
+	return &p
 }
 
 func (p *Human) IsHuman() bool {

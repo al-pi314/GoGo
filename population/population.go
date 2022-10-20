@@ -187,6 +187,14 @@ func (p *Population) fitnessSelection() {
 	p.Size = len(newEnteties)
 }
 
+func (p *Population) BestNPlayer(n int) *player.Agent {
+	if n >= p.Size {
+		return nil
+	}
+
+	return p.Enteties[n].Agent
+}
+
 func (e *Entety) match(o *Entety, gameDymension int) {
 	g := game.NewGame(game.Game{
 		Dymension:   gameDymension,

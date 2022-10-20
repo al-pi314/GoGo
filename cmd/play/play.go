@@ -7,7 +7,6 @@ import (
 
 	"github.com/al-pi314/gogo"
 	"github.com/al-pi314/gogo/game"
-	"github.com/al-pi314/gogo/nn"
 	"github.com/al-pi314/gogo/player"
 	"github.com/al-pi314/gogo/population"
 	"github.com/hajimehoshi/ebiten/v2"
@@ -26,53 +25,57 @@ func loadConfig() *gogo.Config {
 	return &config
 }
 
-func createPlayer(config *gogo.Config, population *population.Population, t *string) player.Player {
-	if *t == "agent" {
-		if len(population.Enteties) == 0 {
-			p := player.NewAgent(player.Agent{
-				Logic: nn.NewNeuralNetwork(nn.NeuralNetwork{
-					Structure: nn.Structure{
-						InputNeurons:         3*config.Dymension*config.Dymension + gogo.GameStateSize(),
-						HiddenNeuronsByLayer: config.HiddenLayers,
-						OutputNeurons:        config.Dymension*config.Dymension + 1,
-					},
-					ActivationFuncName: config.Activation,
-				},
-				),
-			})
-			return &p
-		}
-		p := player.NewAgent(*population.Enteties[0].Agent)
-		return &p
-	}
-	p := player.NewHuman(player.Human{
-		XSnap: config.SquareSize + config.BorderSize,
-		YSnap: config.SquareSize + config.BorderSize,
-	})
-	return &p
+func isArgSet(arg *string) bool {
+	return arg != nil && *arg != ""
 }
 
 func main() {
 	config := loadConfig()
 
-	w := flag.String("white", "human", "set to 'human' or to 'agent'")
-	b := flag.String("black", "human", "set to 'human' or to 'agent'")
-	a := flag.String("population", config.OutputFile, "population file to use for agent players")
+	white := flag.String("white", "human", "set to 'human' or to 'agent'")
+	black := flag.String("black", "human", "set to 'human' or to 'agent'")
+	populationFile := flag.String("population", config.OutputFile, "population file to use for agent players")
+	moveDelay := flag.Int("delay", 0, "miliseconds to wait after each AI move")
 	flag.Parse()
 
+	var whitePlayer player.Player
+	var blackPlayer player.Player
+	whitePlayer = player.NewHuman(player.Human{
+		XSnap: config.SquareSize + config.BorderSize,
+		YSnap: config.SquareSize + config.BorderSize,
+	})
+	blackPlayer = player.NewHuman(player.Human{
+		XSnap: config.SquareSize + config.BorderSize,
+		YSnap: config.SquareSize + config.BorderSize,
+	})
+
 	population := population.NewPopulation(config)
-	if a != nil && *a != "" {
-		population.LoadFromFile(a)
+	if isArgSet(populationFile) {
+		population.LoadFromFile(populationFile)
+
+		n := 0
+		if isArgSet(white) && *white == "agent" {
+			if agent := population.BestNPlayer(n); agent != nil {
+				whitePlayer = agent
+			}
+			n++
+		}
+
+		if isArgSet(black) && *black == "agent" {
+			if agent := population.BestNPlayer(n); agent != nil {
+				blackPlayer = agent
+			}
+			n++
+		}
 	}
-	whitePlayer := createPlayer(config, population, w)
-	blackPlayer := createPlayer(config, population, b)
 
 	game := game.NewGame(game.Game{
-		Dymension:   config.Dymension,
-		SquareSize:  config.SquareSize,
-		BorderSize:  config.BorderSize,
-		WhitePlayer: whitePlayer,
-		BlackPlayer: blackPlayer,
+		Dymension:      config.Dymension,
+		SquareSize:     config.SquareSize,
+		BorderSize:     config.BorderSize,
+		WhitePlayer:    whitePlayer,
+		BlackPlayer:    blackPlayer,
+		AgentMoveDelay: moveDelay,
 	})
 
 	ebiten.SetTPS(ebiten.SyncWithFPS)
