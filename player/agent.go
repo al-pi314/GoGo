@@ -78,8 +78,8 @@ func encodeState(state *GameState) *mat.Dense {
 		raw = append(raw, 0)
 	}
 
-	isMyPiece := state.Moves%2 == 1 // on even moves my pieces are black = false
-	isNotMyPiece := !isMyPiece      // oponents pieces are opposite color
+	isMyPiece := state.MovesCount%2 == 1 // on even moves my pieces are black = false
+	isNotMyPiece := !isMyPiece           // oponents pieces are opposite color
 
 	// encode game state
 	for i := range state.Board {
@@ -129,13 +129,14 @@ func interperate(output *mat.Dense, dymension int) (bool, *MoveSuggestionLinked)
 	return output.At(0, dymension*dymension) >= 0.9, &suggestions
 }
 
-func (p *Agent) Offsprint() *Agent {
-	na := NewAgent(Agent{
+func (p *Agent) Crossover(other *Agent) *Agent {
+	newLogic := p.Logic.Crossover(other.Logic)
+	a := NewAgent(Agent{
 		StabilizationRate: p.StabilizationRate,
 		MutationRate:      (1 - p.StabilizationRate) * p.MutationRate,
-		Logic:             p.Logic.Mutate(p.MutationRate),
+		Logic:             newLogic.Mutate(p.MutationRate),
 	})
-	return &na
+	return &a
 }
 
 func (p *Agent) Place(state *GameState) (bool, *int, *int) {
@@ -143,11 +144,11 @@ func (p *Agent) Place(state *GameState) (bool, *int, *int) {
 		return false, nil, nil
 	}
 
-	if state.Moves > 1000 {
+	if state.MovesCount > 1000 {
 		return true, nil, nil
 	}
 
-	if p.SuggestedOnMove != state.Moves {
+	if p.SuggestedOnMove != state.MovesCount {
 		// refresh cached moves suggestions
 		var skip bool
 		result := p.Logic.Predict(encodeState(state))
@@ -155,7 +156,7 @@ func (p *Agent) Place(state *GameState) (bool, *int, *int) {
 		if skip || p.SuggestedMoves == nil {
 			return true, nil, nil
 		}
-		p.SuggestedOnMove = state.Moves
+		p.SuggestedOnMove = state.MovesCount
 	}
 
 	// no more suggeste moves means no possible moves

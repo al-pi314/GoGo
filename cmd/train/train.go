@@ -11,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/al-pi314/gogo"
+	"github.com/al-pi314/gogo/game"
 	"github.com/al-pi314/gogo/population"
 	"github.com/spf13/viper"
 )
@@ -30,16 +31,19 @@ func loadConfig() *gogo.Config {
 	return &config
 }
 
-func confirmFile(filePath string) *os.File {
-	if _, err := os.Stat(filePath); !errors.Is(err, os.ErrNotExist) {
-		fmt.Printf("...output %s file already exists! File will be overwritten (3s to cancel).\n", filePath)
-		time.Sleep(3 * time.Second)
+func confirmDirectory(dirPath string) {
+	if _, err := os.Stat(dirPath); !errors.Is(err, os.ErrNotExist) {
+		fmt.Printf("...output %s directory already exists! Directory files will be removed (5s to cancel)\n", dirPath)
+		time.Sleep(5 * time.Second)
+
+		if err := os.RemoveAll(dirPath); err != nil {
+			log.Fatal("failed to empty directory")
+		}
 	}
-	file, err := os.OpenFile(filePath, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0755)
+	err := os.MkdirAll(dirPath, os.ModePerm)
 	if err != nil {
-		return nil
+		log.Fatal(errors.Wrap(err, "failed to created population directory"))
 	}
-	return file
 }
 
 func isArgSet(arg *string) bool {
@@ -51,42 +55,49 @@ func main() {
 	config := loadConfig()
 
 	populationFile := flag.String("population", "", "path to population.json file containing a population")
-	outputFile := flag.String("output", "", "path to output file after population training is done")
+	outputDirectory := flag.String("output", "", "path to output directory for training")
 	flag.Parse()
 
-	// select output file
-	if isArgSet(outputFile) {
-		config.OutputFile = *outputFile
-		fmt.Println("...using output file provided in command line")
+	// select output directory
+	if isArgSet(outputDirectory) {
+		config.OutputDirectory = *outputDirectory
+		fmt.Println("...using output directory provided in command line")
 	}
-	fmt.Printf("...output file is set to %s\n", config.OutputFile)
+	fmt.Printf("...output directory is set to %s\n", config.OutputDirectory)
 
-	// confirm output file
-	file := confirmFile(config.OutputFile)
-	if file == nil {
-		log.Fatal("provided output file cannot be accessed or created!")
-	}
-	fmt.Println("...output file confirmed")
+	// confirm output directory
+	confirmDirectory(config.OutputDirectory)
+	fmt.Println("...output directory confirmed")
 
 	// create population
-	population := population.NewPopulation(config)
+	currPopulation := population.NewPopulation(config)
 	fmt.Println("...population created")
 	if isArgSet(populationFile) {
-		population.LoadFromFile(populationFile)
+		currPopulation.LoadFromFile(populationFile)
 		fmt.Println("...population overwritten from file")
 	}
-	population.OutputFileName = config.OutputFile
+	currPopulation.OutputDirectory = config.OutputDirectory
 
 	// test save population
-	population.Save()
-	fmt.Println("...test save completed (check output file!)")
+	currPopulation.Save()
+	game.NewGame(game.Game{
+		SaveFileName: fmt.Sprintf("%s/games/dummy_game.json", config.OutputDirectory),
+	}).Save()
+	fmt.Println("...test save completed (check output directory!)")
 
 	// train population
-	population.Train(config.Matches, config.SaveInterval, file)
+	currPopulation.Train(population.TrainingSettings{
+		Rounds:    config.Rounds,
+		Groups:    config.Groups,
+		KeepBestN: config.KeepBestN,
+
+		SaveInterval:     config.SaveInterval,
+		SaveGameInterval: config.SaveGameInterval,
+	})
+
 	fmt.Println("...training completed")
 
 	// save population
-	population.Save()
-	file.Close()
+	currPopulation.Save()
 	fmt.Println("...last population saved - finished!")
 }

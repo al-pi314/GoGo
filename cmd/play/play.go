@@ -34,7 +34,7 @@ func main() {
 
 	white := flag.String("white", "human", "set to 'human' or to 'agent'")
 	black := flag.String("black", "human", "set to 'human' or to 'agent'")
-	populationFile := flag.String("population", config.OutputFile, "population file to use for agent players")
+	populationFile := flag.String("population", "", "population file to use for agent players")
 	moveDelay := flag.Int("delay", 0, "miliseconds to wait after each AI move")
 	flag.Parse()
 

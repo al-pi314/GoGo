@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"math/rand"
 	"os"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/al-pi314/gogo"
@@ -17,13 +19,14 @@ import (
 )
 
 type Population struct {
-	GameDymension int
-	Enteties      []*Entety
-	Age           int
-	Size          int
+	GameDymension   int
+	Enteties        []*Entety
+	Age             int
+	Size            int
+	OutputDirectory string
 
-	OutputFileName string   `json:"-"`
-	File           *os.File `json:"-"`
+	outputFileName string   `json:"-"`
+	file           *os.File `json:"-"`
 }
 
 type Entety struct {
@@ -38,8 +41,9 @@ type TrainingSave struct {
 
 func NewPopulation(config *gogo.Config) *Population {
 	p := Population{
-		GameDymension: config.Dymension,
-		Enteties:      []*Entety{},
+		GameDymension:   config.Dymension,
+		Enteties:        []*Entety{},
+		OutputDirectory: strings.TrimSuffix(config.OutputDirectory, "/"),
 	}
 	for len(p.Enteties) < config.PopulationSize {
 		agent := player.NewAgent(player.Agent{
@@ -57,6 +61,11 @@ func NewPopulation(config *gogo.Config) *Population {
 		p.AddEntety(&Entety{
 			Agent: &agent,
 		})
+	}
+
+	p.outputFileName = fmt.Sprintf("%s/population.json", p.OutputDirectory)
+	if err := os.Mkdir(fmt.Sprintf("%s/games", p.OutputDirectory), os.ModePerm); err != nil && !errors.Is(err, os.ErrExist) {
+		log.Fatal(errors.Wrap(err, "failed to create games directory inside of population directory"))
 	}
 	return &p
 }
@@ -93,23 +102,23 @@ func (p *Population) AddEntety(e *Entety) {
 	p.Size++
 }
 
-func (p *Population) OpenOuptutFile(filePath string) {
+func (p *Population) OpenOutputFile(filePath string) {
 	var err error
-	p.File, err = os.OpenFile(filePath, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0755)
+	p.file, err = os.OpenFile(filePath, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0755)
 	if err != nil {
 		log.Print(errors.Wrap(err, "failed to open output file!"))
 	} else {
-		p.OutputFileName = filePath
+		p.outputFileName = filePath
 	}
 }
 
 func (p *Population) Save() {
-	if p.File == nil {
-		p.OpenOuptutFile(p.OutputFileName)
+	if p.file == nil {
+		p.OpenOutputFile(p.outputFileName)
 	}
 	defer func() {
-		p.File.Close()
-		p.File = nil
+		p.file.Close()
+		p.file = nil
 	}()
 
 	now := time.Now()
@@ -121,70 +130,120 @@ func (p *Population) Save() {
 		log.Fatal(errors.Wrap(err, "could not marshal population"))
 	}
 
-	n, err := p.File.Write(bytes)
+	n, err := p.file.Write(bytes)
 	if err != nil || n != len(bytes) {
 		log.Fatal(errors.Wrap(err, fmt.Sprintf("writting error or the write was incomplete (attempted to write %d bytes, written %d bytes)", len(bytes), n)))
 	}
+	fmt.Println("saved population!")
 }
 
-func (p *Population) Train(rounds int, saveInterval int, file *os.File) {
-	for i := 0; i < rounds; i++ {
+type TrainingSettings struct {
+	Rounds    int
+	Groups    int
+	KeepBestN int
+
+	SaveInterval     int
+	SaveGameInterval int
+}
+
+func (p *Population) Train(settings TrainingSettings) {
+	for i := 0; i < settings.Rounds; i++ {
 		s := time.Now().UnixMilli()
+		fmt.Println("-------------------------------------")
 		fmt.Printf("starting round (population age %d) %d\n", p.Age, i)
-		p.playMatches()
-		p.fitnessSelection()
-		p.Age++
+
+		// divide population into groups
+		groups := p.CreateGroups(settings.Groups)
+
+		// play games among agents inside groups and select top N
+		groupsBest := [][]*Entety{}
+		saveBestGames := (i+1)%settings.SaveGameInterval == 0
+		for i, group := range groups {
+			groupsBest = append(groupsBest, p.playMatches(i, group, settings.KeepBestN, saveBestGames))
+			fmt.Println("-------------")
+		}
+
+		// crossover and mutate group winners to create new population
+		p.newPopulation(groupsBest, settings.KeepBestN)
+
 		d := time.Now().UnixMilli() - s
 		fmt.Printf("finished round %d (miliseconds spent %d)\n", i, d)
 
-		if (i+1)%saveInterval == 0 {
-			fmt.Println("saving population")
+		// check save intervals
+		if (i+1)%settings.SaveInterval == 0 {
 			p.Save()
 		}
 	}
 }
 
-func (p *Population) playMatches() {
-	for idOne, entetyOne := range p.Enteties {
-		for idTwo, entetyTwo := range p.Enteties {
+func (p *Population) CreateGroups(groups int) [][]*Entety {
+	groupSize := p.Size / groups
+	result := [][]*Entety{}
+	for i := 0; i < groups; i++ {
+		result = append(result, p.Enteties[i*groupSize:(i+1)*groupSize])
+	}
+	return result
+}
+
+func (p *Population) playMatches(groupID int, enteties []*Entety, toKeep int, saveBest bool) []*Entety {
+	s := time.Now().UnixMilli()
+	fmt.Printf("[group %d] starting group matches\n", groupID)
+	var best *float64
+	var bestGame *game.Game
+	gameName := ""
+	for idOne, entetyOne := range enteties {
+		for idTwo, entetyTwo := range enteties {
 			if idOne == idTwo {
 				continue
 			}
-			entetyOne.match(entetyTwo, p.GameDymension)
+			score, game := entetyOne.match(entetyTwo, p.GameDymension)
+			if best == nil || *best > math.Abs(score) {
+				best = &score
+				bestGame = game
+				gameName = fmt.Sprintf("group_%d_%d_%d_%d.json", p.Age, groupID, idOne, idTwo)
+			}
 		}
 	}
-}
-
-func (p *Population) sortEnteites() {
-	sort.Slice(p.Enteties, func(i, j int) bool {
-		return p.Enteties[i].Score >= p.Enteties[j].Score
-	})
-}
-
-func (p *Population) fitnessSelection() {
-	p.sortEnteites()
-
-	newEnteties := []*Entety{}
-	averageScore := 0.0
-	for i := 0; i < len(p.Enteties)/2; i++ {
-		newEnteties = append(newEnteties, &Entety{
-			Agent: p.Enteties[i].Agent.Offsprint(),
-		})
-		newEnteties = append(newEnteties, &Entety{
-			Agent: p.Enteties[i].Agent.Offsprint(),
-		})
-		averageScore += p.Enteties[i].Score
+	if saveBest {
+		bestGame.SaveFileName = fmt.Sprintf("%s/games/%s", p.OutputDirectory, gameName)
+		bestGame.Save()
 	}
-	averageScore /= float64(len(newEnteties) / 2)
 
-	fmt.Println("fitness information:")
-	fmt.Printf("...population size %d, selected best %d enteties\n", p.Size, len(p.Enteties)/2)
-	fmt.Printf("...best entety score: %f\n", p.Enteties[0].Score)
-	fmt.Printf("...worst entety score: %f\n", p.Enteties[len(p.Enteties)-1].Score)
-	fmt.Printf("...worst selected score: %f\n", p.Enteties[len(p.Enteties)/2].Score)
-	fmt.Printf("...selected enteties average score: %f\n", averageScore)
-	p.Enteties = newEnteties
-	p.Size = len(newEnteties)
+	sort.Slice(enteties, func(i, j int) bool {
+		return enteties[i].Score >= enteties[j].Score
+	})
+	fmt.Printf("[group %d] best entety score %f\n", groupID, enteties[0].Score)
+	fmt.Printf("[group %d] finished group matches (miliseconds spent %d)\n", groupID, time.Now().UnixMilli()-s)
+	return enteties[:toKeep]
+}
+
+func (p *Population) newPopulation(groups [][]*Entety, groupsSize int) {
+	prevSize := p.Size
+	p.Enteties = []*Entety{}
+	p.Size = 0
+
+	groupIdx := 0
+	inGroupIdx := 0
+	for p.Size < prevSize {
+		// select parents
+		entetyOne := groups[groupIdx][inGroupIdx]
+		entetyTwo := groups[rand.Intn(len(groups))][rand.Intn(groupsSize)]
+
+		// crossover & mutate for new entety
+		newEntety := Entety{
+			Agent: entetyOne.Agent.Crossover(entetyTwo.Agent),
+		}
+		p.AddEntety(&newEntety)
+
+		// select next entety
+		groupIdx++
+		if groupIdx >= len(groups) {
+			groupIdx = 0
+			inGroupIdx = (inGroupIdx + 1) % groupsSize
+		}
+	}
+
+	p.Age++
 }
 
 func (p *Population) BestNPlayer(n int) *player.Agent {
@@ -195,7 +254,7 @@ func (p *Population) BestNPlayer(n int) *player.Agent {
 	return p.Enteties[n].Agent
 }
 
-func (e *Entety) match(o *Entety, gameDymension int) {
+func (e *Entety) match(o *Entety, gameDymension int) (float64, *game.Game) {
 	g := game.NewGame(game.Game{
 		Dymension:   gameDymension,
 		WhitePlayer: e.Agent,
@@ -209,4 +268,5 @@ func (e *Entety) match(o *Entety, gameDymension int) {
 	score := g.Score() / math.Max(1, float64(g.Moves()))
 	e.Score += score
 	o.Score += -score
+	return score, g
 }

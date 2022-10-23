@@ -1,9 +1,11 @@
 package game
 
 import (
-	"errors"
+	"encoding/json"
 	"fmt"
 	"image/color"
+	"log"
+	"os"
 	"time"
 
 	"github.com/al-pi314/gogo"
@@ -11,6 +13,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/text"
+	"github.com/pkg/errors"
 	"golang.org/x/image/font/basicfont"
 )
 
@@ -20,6 +23,8 @@ type Cordinate struct {
 }
 
 type Game struct {
+	SaveFileName   string
+	saveFile       *os.File
 	Dymension      int
 	SquareSize     int
 	BorderSize     int
@@ -52,6 +57,46 @@ func NewGame(g Game) *Game {
 }
 
 // ------------------------------------ Helper Functions ------------------------------------ \\
+type GameSave struct {
+	Time  *time.Time
+	Moves [][2]int
+}
+
+func (g *Game) Save() {
+	if g.saveFile == nil {
+		g.OpenOutputFile(g.SaveFileName)
+	}
+	defer func() {
+		g.saveFile.Close()
+		g.saveFile = nil
+	}()
+
+	now := time.Now()
+	bytes, err := json.Marshal(GameSave{
+		Time:  &now,
+		Moves: g.gameState.Moves,
+	})
+	if err != nil {
+		log.Fatal(errors.Wrap(err, "could not marshal game"))
+	}
+
+	n, err := g.saveFile.Write(bytes)
+	if err != nil || n != len(bytes) {
+		log.Fatal(errors.Wrap(err, fmt.Sprintf("writting error or the write was incomplete (attempted to write %d bytes, written %d bytes)", len(bytes), n)))
+	}
+	fmt.Println("saved game!")
+}
+
+func (g *Game) OpenOutputFile(filePath string) {
+	var err error
+	g.saveFile, err = os.OpenFile(filePath, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0755)
+	if err != nil {
+		log.Print(errors.Wrap(err, "failed to open output file!"))
+	} else {
+		g.SaveFileName = filePath
+	}
+}
+
 func (g *Game) Size() (int, int) {
 	side := g.Dymension*(g.SquareSize+g.BorderSize) + g.BorderSize
 	return side, side
@@ -228,7 +273,7 @@ func (g *Game) caputreOpponent(x, y int, white bool) bool {
 
 // Moves returns number of moves palyed by players.
 func (g *Game) Moves() int {
-	return g.gameState.Moves
+	return g.gameState.MovesCount
 }
 
 // Score calculates game score based on the current position.
@@ -287,7 +332,7 @@ func (g *Game) Update() error {
 		g.delay_lock = false
 		// change player to move
 		g.whiteToMove = !g.whiteToMove
-		g.gameState.Moves++
+		g.gameState.MovesCount++
 		if !opponent.IsHuman() && g.AgentMoveDelay != nil {
 			time.Sleep(time.Duration(*g.AgentMoveDelay) * time.Millisecond)
 		}

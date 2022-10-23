@@ -126,6 +126,41 @@ func (nn *NeuralNetwork) Predict(input *mat.Dense) *mat.Dense {
 	return output
 }
 
+func (nn *NeuralNetwork) Crossover(other *NeuralNetwork) *NeuralNetwork {
+	return &NeuralNetwork{
+		Structure:          nn.Structure,
+		ActivationFuncName: nn.ActivationFuncName,
+		activation:         nn.activation,
+		WHiddenByLayer:     crossoverArray(nn.WHiddenByLayer, other.WHiddenByLayer),
+		BHiddenByLayer:     crossoverArray(nn.BHiddenByLayer, other.BHiddenByLayer),
+		WOut:               nn.WOut.crossover(other.WOut),
+		BOut:               nn.BOut.crossover(other.BOut),
+	}
+}
+
+func crossoverArray(arrayOne []MatDense, arrayTwo []MatDense) []MatDense {
+	nMatDense := []MatDense{}
+	for i := range arrayOne {
+		nMatDense = append(nMatDense, arrayOne[i].crossover(arrayTwo[i]))
+	}
+	return nMatDense
+}
+
+func (m *MatDense) crossover(other MatDense) MatDense {
+	iLimit := rand.Intn(m.M.RawMatrix().Rows)
+	jLimit := rand.Intn(m.M.RawMatrix().Cols)
+	crossoverFunc := func(i int, j int, v float64) float64 {
+		if i <= iLimit && j <= jLimit {
+			return m.M.At(i, j)
+		}
+		return other.M.At(i, j)
+	}
+
+	newMatDense := MatDense{mat.NewDense(m.M.RawMatrix().Rows, m.M.RawMatrix().Cols, nil)}
+	newMatDense.M.Apply(crossoverFunc, m.M)
+	return newMatDense
+}
+
 func (nn *NeuralNetwork) Mutate(rate float64) *NeuralNetwork {
 	newNN := NeuralNetwork{
 		Structure:          nn.Structure,
@@ -156,8 +191,8 @@ func (nn *NeuralNetwork) Mutate(rate float64) *NeuralNetwork {
 		newBiases.Apply(mutateFunc, layer.M)
 	}
 
-	newNN.WOut.M.Apply(mutateFunc, newNN.WOut.M)
-	newNN.BOut.M.Apply(mutateFunc, newNN.BOut.M)
+	newNN.WOut.M.Apply(mutateFunc, nn.WOut.M)
+	newNN.BOut.M.Apply(mutateFunc, nn.BOut.M)
 
 	return &newNN
 }

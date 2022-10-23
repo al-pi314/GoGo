@@ -17,7 +17,10 @@ type Config struct {
 	PopulationSize    int     `mapstructure:"population_size"`
 	MutationRate      float64 `mapstructure:"mutation_rate"`
 	StabilizationRate float64 `mapstructure:"stabilization_rate"`
-	Matches           int     `mapstructure:"matches"`
+	Rounds            int     `mapstructure:"rounds"`
+	Groups            int     `mapstructure:"groups"`
+	KeepBestN         int     `mapstructure:"keep_best_n"`
 	SaveInterval      int     `mapstructure:"save_interval"`
-	OutputFile        string  `mapstructure:"output_file"`
+	SaveGameInterval  int     `mapstructure:"save_game_interval"`
+	OutputDirectory   string  `mapstructure:"output_directory"`
 }
