@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -53,6 +54,10 @@ func isArgSet(arg *string) bool {
 func main() {
 	fmt.Println("...starting training")
 	config := loadConfig()
+
+	// display config
+	b, _ := json.Marshal(config)
+	fmt.Println(string(b))
 
 	populationFile := flag.String("population", "", "path to population.json file containing a population")
 	outputDirectory := flag.String("output", "", "path to output directory for training")
