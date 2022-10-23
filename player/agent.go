@@ -144,7 +144,7 @@ func (p *Agent) Place(state *GameState) (bool, *int, *int) {
 		return false, nil, nil
 	}
 
-	if state.MovesCount > 1000 {
+	if state.MovesCount > 3*len(state.Board) {
 		return true, nil, nil
 	}
 
