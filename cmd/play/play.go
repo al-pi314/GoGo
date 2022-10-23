@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"math/rand"
 
@@ -35,7 +36,8 @@ func main() {
 	white := flag.String("white", "human", "set to 'human' or to 'agent'")
 	black := flag.String("black", "human", "set to 'human' or to 'agent'")
 	populationFile := flag.String("population", "", "population file to use for agent players")
-	moveDelay := flag.Int("delay", 0, "miliseconds to wait after each AI move")
+	moveDelay := flag.Int("delay", 0, "miliseconds to wait after each move not made by human")
+	replay := flag.String("replay", "human", "game save file to replay")
 	flag.Parse()
 
 	var whitePlayer player.Player
@@ -77,6 +79,13 @@ func main() {
 		BlackPlayer:    blackPlayer,
 		AgentMoveDelay: moveDelay,
 	})
+
+	if isArgSet(replay) {
+		game.ReplayFromFile(*replay)
+		if moveDelay == nil {
+			fmt.Println("WARRNING: move delay not set, use -delay flag to set replay pace")
+		}
+	}
 
 	ebiten.SetTPS(ebiten.SyncWithFPS)
 	ebiten.SetWindowSize(game.Size())

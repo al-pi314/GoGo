@@ -38,6 +38,10 @@ type Game struct {
 	delay_lock bool
 	locked     Cordinate
 
+	replayMoves   [][2]int
+	replayMoveIdx int
+	isReplay      bool
+
 	gameState *GameState
 }
 
@@ -212,6 +216,23 @@ func (g *Game) asignTeritory(x, y int, checked map[Cordinate]bool) (bool, *bool,
 // ------------------------------------ ----------------- ------------------------------------ \\
 
 // -------------------------------------- Game Functions ------------------------------------- \\
+func (g *Game) ReplayFromFile(gameFile string) {
+	raw, err := os.ReadFile(gameFile)
+	if err != nil {
+		log.Fatal(errors.Wrap(err, "failed to open game file"))
+	}
+
+	gameSave := GameSave{}
+	if err := json.Unmarshal(raw, &gameSave); err != nil {
+		log.Fatal(errors.Wrap(err, "failed to load game save file"))
+	}
+
+	fmt.Printf("...replaying game save from %s\n", gameSave.Time.String())
+	g.replayMoves = gameSave.Moves
+	g.replayMoveIdx = 0
+	g.isReplay = true
+}
+
 func (g *Game) placePiece(x, y int, white bool) bool {
 	// out of bounds or already occupied spaces are invalid
 	if y >= len(g.gameState.Board) || y < 0 || x >= len(g.gameState.Board[y]) || x < 0 || g.gameState.Board[y][x] != nil {
@@ -313,8 +334,26 @@ func (g *Game) Update() error {
 		opponent = g.WhitePlayer
 	}
 
-	skip, x, y := player.Place(g.gameState)
+	var skip bool
+	var x, y *int
+	if !g.isReplay {
+		skip, x, y = player.Place(g.gameState)
+	} else {
+		if g.replayMoveIdx >= len(g.replayMoves) {
+			g.active = false
+			return nil
+		}
+		cord := g.replayMoves[g.replayMoveIdx]
+		x = &cord[0]
+		y = &cord[1]
+		skip = false
+		g.replayMoveIdx++
+	}
+
 	if skip || ((x != nil && y != nil) && g.placePiece(*x, *y, g.whiteToMove)) {
+		// save move
+		g.gameState.MovesCount++
+		g.gameState.Moves = append(g.gameState.Moves, [2]int{*x, *y})
 		// consequitive skips end the game
 		if skip && g.gameState.OpponentSkipped {
 			g.active = false
@@ -332,7 +371,6 @@ func (g *Game) Update() error {
 		g.delay_lock = false
 		// change player to move
 		g.whiteToMove = !g.whiteToMove
-		g.gameState.MovesCount++
 		if !opponent.IsHuman() && g.AgentMoveDelay != nil {
 			time.Sleep(time.Duration(*g.AgentMoveDelay) * time.Millisecond)
 		}
