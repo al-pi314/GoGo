@@ -23,14 +23,14 @@ type Cordinate struct {
 }
 
 type Game struct {
-	SaveFileName   string
-	saveFile       *os.File
-	Dymension      int
-	SquareSize     int
-	BorderSize     int
-	WhitePlayer    player.Player
-	BlackPlayer    player.Player
-	AgentMoveDelay *int
+	SaveFileName string
+	saveFile     *os.File
+	Dymension    int
+	SquareSize   int
+	BorderSize   int
+	WhitePlayer  player.Player
+	BlackPlayer  player.Player
+	MoveDelay    *int
 
 	active      bool
 	whiteToMove bool
@@ -345,6 +345,7 @@ func (g *Game) Update() error {
 			g.active = false
 			return nil
 		}
+
 		cord := g.replayMoves[g.replayMoveIdx]
 		x = cord[0]
 		y = cord[1]
@@ -373,8 +374,8 @@ func (g *Game) Update() error {
 		g.delay_lock = false
 		// change player to move
 		g.whiteToMove = !g.whiteToMove
-		if !opponent.IsHuman() && g.AgentMoveDelay != nil {
-			time.Sleep(time.Duration(*g.AgentMoveDelay) * time.Millisecond)
+		if (g.isReplay || !opponent.IsHuman()) && g.MoveDelay != nil {
+			time.Sleep(time.Duration(*g.MoveDelay) * time.Millisecond)
 		}
 	}
 	return nil

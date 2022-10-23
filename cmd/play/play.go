@@ -72,12 +72,12 @@ func main() {
 	}
 
 	game := game.NewGame(game.Game{
-		Dymension:      config.Dymension,
-		SquareSize:     config.SquareSize,
-		BorderSize:     config.BorderSize,
-		WhitePlayer:    whitePlayer,
-		BlackPlayer:    blackPlayer,
-		AgentMoveDelay: moveDelay,
+		Dymension:   config.Dymension,
+		SquareSize:  config.SquareSize,
+		BorderSize:  config.BorderSize,
+		WhitePlayer: whitePlayer,
+		BlackPlayer: blackPlayer,
+		MoveDelay:   moveDelay,
 	})
 
 	if isArgSet(replay) {
