@@ -4,7 +4,7 @@ import "reflect"
 
 type GameState struct {
 	Board               [][]*bool
-	Moves               [][2]int
+	Moves               [][2]*int
 	MovesCount          int
 	OpponentSkipped     bool `encode:"true"`
 	BlackStones         int  `encode:"true"`

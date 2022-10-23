@@ -81,7 +81,7 @@ func main() {
 		currPopulation.LoadFromFile(populationFile)
 		fmt.Println("...population overwritten from file")
 	}
-	currPopulation.OutputDirectory = config.OutputDirectory
+	currPopulation.CreateFiles(config.OutputDirectory)
 
 	// test save population
 	currPopulation.Save()

@@ -41,9 +41,8 @@ type TrainingSave struct {
 
 func NewPopulation(config *gogo.Config) *Population {
 	p := Population{
-		GameDymension:   config.Dymension,
-		Enteties:        []*Entety{},
-		OutputDirectory: strings.TrimSuffix(config.OutputDirectory, "/"),
+		GameDymension: config.Dymension,
+		Enteties:      []*Entety{},
 	}
 	for len(p.Enteties) < config.PopulationSize {
 		agent := player.NewAgent(player.Agent{
@@ -63,11 +62,16 @@ func NewPopulation(config *gogo.Config) *Population {
 		})
 	}
 
+	p.CreateFiles(config.OutputDirectory)
+	return &p
+}
+
+func (p *Population) CreateFiles(outputDir string) {
+	p.OutputDirectory = strings.TrimSuffix(outputDir, "/")
 	p.outputFileName = fmt.Sprintf("%s/population.json", p.OutputDirectory)
 	if err := os.Mkdir(fmt.Sprintf("%s/games", p.OutputDirectory), os.ModePerm); err != nil && !errors.Is(err, os.ErrExist) {
 		log.Fatal(errors.Wrap(err, "failed to create games directory inside of population directory"))
 	}
-	return &p
 }
 
 func (p *Population) LoadFromFile(filePath *string) bool {
@@ -106,7 +110,7 @@ func (p *Population) OpenOutputFile(filePath string) {
 	var err error
 	p.file, err = os.OpenFile(filePath, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0755)
 	if err != nil {
-		log.Print(errors.Wrap(err, "failed to open output file!"))
+		log.Print(errors.Wrap(err, fmt.Sprintf("failed to open population output file %q", filePath)))
 	} else {
 		p.outputFileName = filePath
 	}

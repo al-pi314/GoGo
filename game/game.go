@@ -38,7 +38,7 @@ type Game struct {
 	delay_lock bool
 	locked     Cordinate
 
-	replayMoves   [][2]int
+	replayMoves   [][2]*int
 	replayMoveIdx int
 	isReplay      bool
 
@@ -50,6 +50,7 @@ type GameState = gogo.GameState
 func NewGame(g Game) *Game {
 	g.gameState = &GameState{
 		Board: make([][]*bool, g.Dymension),
+		Moves: [][2]*int{},
 	}
 	for y := range g.gameState.Board {
 		g.gameState.Board[y] = make([]*bool, g.Dymension)
@@ -63,7 +64,7 @@ func NewGame(g Game) *Game {
 // ------------------------------------ Helper Functions ------------------------------------ \\
 type GameSave struct {
 	Time  *time.Time
-	Moves [][2]int
+	Moves [][2]*int
 }
 
 func (g *Game) Save() {
@@ -95,7 +96,7 @@ func (g *Game) OpenOutputFile(filePath string) {
 	var err error
 	g.saveFile, err = os.OpenFile(filePath, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0755)
 	if err != nil {
-		log.Print(errors.Wrap(err, "failed to open output file!"))
+		log.Print(errors.Wrap(err, fmt.Sprintf("failed to open game output file %q", filePath)))
 	} else {
 		g.SaveFileName = filePath
 	}
@@ -231,6 +232,7 @@ func (g *Game) ReplayFromFile(gameFile string) {
 	g.replayMoves = gameSave.Moves
 	g.replayMoveIdx = 0
 	g.isReplay = true
+	fmt.Printf("...game lasted %d moves\n", len(g.replayMoves))
 }
 
 func (g *Game) placePiece(x, y int, white bool) bool {
@@ -339,21 +341,21 @@ func (g *Game) Update() error {
 	if !g.isReplay {
 		skip, x, y = player.Place(g.gameState)
 	} else {
-		if g.replayMoveIdx >= len(g.replayMoves) {
+		if g.replayMoves == nil || g.replayMoveIdx >= len(g.replayMoves) {
 			g.active = false
 			return nil
 		}
 		cord := g.replayMoves[g.replayMoveIdx]
-		x = &cord[0]
-		y = &cord[1]
-		skip = false
+		x = cord[0]
+		y = cord[1]
+		skip = (x == nil && y == nil)
 		g.replayMoveIdx++
 	}
 
 	if skip || ((x != nil && y != nil) && g.placePiece(*x, *y, g.whiteToMove)) {
 		// save move
 		g.gameState.MovesCount++
-		g.gameState.Moves = append(g.gameState.Moves, [2]int{*x, *y})
+		g.gameState.Moves = append(g.gameState.Moves, [2]*int{x, y})
 		// consequitive skips end the game
 		if skip && g.gameState.OpponentSkipped {
 			g.active = false
