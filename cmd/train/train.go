@@ -92,9 +92,10 @@ func main() {
 
 	// train population
 	currPopulation.Train(population.TrainingSettings{
-		Rounds:    config.Rounds,
-		Groups:    config.Groups,
-		KeepBestN: config.KeepBestN,
+		Rounds:            config.Rounds,
+		Groups:            config.Groups,
+		SelectBestInGroup: config.SelectBestInGroup,
+		KeepBestInGroup:   config.KeepBestInGroup,
 
 		SaveInterval:     config.SaveInterval,
 		SaveGameInterval: config.SaveGameInterval,

@@ -142,9 +142,10 @@ func (p *Population) Save() {
 }
 
 type TrainingSettings struct {
-	Rounds    int
-	Groups    int
-	KeepBestN int
+	Rounds            int
+	Groups            int
+	SelectBestInGroup int
+	KeepBestInGroup   int
 
 	SaveInterval     int
 	SaveGameInterval int
@@ -163,12 +164,12 @@ func (p *Population) Train(settings TrainingSettings) {
 		groupsBest := [][]*Entety{}
 		saveBestGames := (i+1)%settings.SaveGameInterval == 0
 		for i, group := range groups {
-			groupsBest = append(groupsBest, p.playMatches(i, group, settings.KeepBestN, saveBestGames))
+			groupsBest = append(groupsBest, p.playMatches(i, group, settings.SelectBestInGroup, saveBestGames))
 			fmt.Println("-------------")
 		}
 
 		// crossover and mutate group winners to create new population
-		p.newPopulation(groupsBest, settings.KeepBestN)
+		p.newPopulation(groupsBest, settings.SelectBestInGroup, settings.KeepBestInGroup)
 
 		d := time.Now().UnixMilli() - s
 		fmt.Printf("finished round %d (miliseconds spent %d)\n", i, d)
@@ -229,10 +230,18 @@ func (p *Population) playMatches(groupID int, enteties []*Entety, toKeep int, sa
 	return enteties[:toKeep]
 }
 
-func (p *Population) newPopulation(groups [][]*Entety, groupsSize int) {
+func (p *Population) newPopulation(groups [][]*Entety, groupsSize int, keepTopInGroup int) {
 	prevSize := p.Size
 	p.Enteties = []*Entety{}
 	p.Size = 0
+
+	for i := 0; i < keepTopInGroup; i++ {
+		for gi := range groups {
+			if p.Size < prevSize {
+				p.Enteties = append(p.Enteties, groups[gi][i])
+			}
+		}
+	}
 
 	groupIdx := 0
 	inGroupIdx := 0
@@ -258,7 +267,7 @@ func (p *Population) newPopulation(groups [][]*Entety, groupsSize int) {
 	p.Age++
 }
 
-func (p *Population) BestNPlayer(n int) *player.Agent {
+func (p *Population) FirstNthAgent(n int) *player.Agent {
 	if n >= p.Size {
 		return nil
 	}

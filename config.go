@@ -19,7 +19,8 @@ type Config struct {
 	StabilizationRate float64 `mapstructure:"stabilization_rate"`
 	Rounds            int     `mapstructure:"rounds"`
 	Groups            int     `mapstructure:"groups"`
-	KeepBestN         int     `mapstructure:"keep_best_n"`
+	SelectBestInGroup int     `mapstructure:"select_best_in_group"`
+	KeepBestInGroup   int     `mapstructure:"keep_best_in_group"`
 	SaveInterval      int     `mapstructure:"save_interval"`
 	SaveGameInterval  int     `mapstructure:"save_game_interval"`
 	OutputDirectory   string  `mapstructure:"output_directory"`
