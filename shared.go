@@ -6,6 +6,8 @@ type GameState struct {
 	Board               [][]*bool
 	Moves               [][2]*int
 	MovesCount          int
+	WhiteMoves          int  `encode:"true"`
+	BlackMoves          int  `encode:"true"`
 	OpponentSkipped     bool `encode:"true"`
 	BlackStones         int  `encode:"true"`
 	WhiteStones         int  `encode:"true"`

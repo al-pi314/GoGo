@@ -181,6 +181,11 @@ func (p *Population) Train(settings TrainingSettings) {
 }
 
 func (p *Population) CreateGroups(groups int) [][]*Entety {
+	for i := range p.Enteties {
+		j := rand.Intn(i + 1)
+		p.Enteties[i], p.Enteties[j] = p.Enteties[j], p.Enteties[i]
+	}
+
 	groupSize := p.Size / groups
 	result := [][]*Entety{}
 	for i := 0; i < groups; i++ {
@@ -200,7 +205,10 @@ func (p *Population) playMatches(groupID int, enteties []*Entety, toKeep int, sa
 			if idOne == idTwo {
 				continue
 			}
-			score, game := entetyOne.match(entetyTwo, p.GameDymension)
+			score, whiteScore, blackScore, game := entetyOne.match(entetyTwo, p.GameDymension)
+			entetyOne.Score += whiteScore
+			entetyTwo.Score += blackScore
+
 			if best == nil || *best > math.Abs(score) {
 				best = &score
 				bestGame = game
@@ -258,7 +266,7 @@ func (p *Population) BestNPlayer(n int) *player.Agent {
 	return p.Enteties[n].Agent
 }
 
-func (e *Entety) match(o *Entety, gameDymension int) (float64, *game.Game) {
+func (e *Entety) match(o *Entety, gameDymension int) (float64, float64, float64, *game.Game) {
 	g := game.NewGame(game.Game{
 		Dymension:   gameDymension,
 		WhitePlayer: e.Agent,
@@ -269,8 +277,9 @@ func (e *Entety) match(o *Entety, gameDymension int) (float64, *game.Game) {
 		// play game
 	}
 
-	score := g.Score() / math.Max(1, float64(g.Moves()))
-	e.Score += score
-	o.Score += -score
-	return score, g
+	gameScore, ws, bs := g.FullScore()
+	_, wm, bm := g.FullMoves()
+	whiteScorePerMoves := ws / math.Max(1, float64(wm))
+	blackScorePerMoves := bs / math.Max(1, float64(bm))
+	return gameScore, whiteScorePerMoves, blackScorePerMoves, g
 }

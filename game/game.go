@@ -294,15 +294,22 @@ func (g *Game) caputreOpponent(x, y int, white bool) bool {
 	return len(toRemove) != 0
 }
 
+// FullMoves returns number of moves and number of moves made by each player
+func (g *Game) FullMoves() (int, int, int) {
+	return g.gameState.MovesCount, g.gameState.WhiteMoves, g.gameState.BlackMoves
+}
+
 // Moves returns number of moves palyed by players.
 func (g *Game) Moves() int {
 	return g.gameState.MovesCount
 }
 
-// Score calculates game score based on the current position.
-func (g *Game) Score() float64 {
+// FullScore calculates game score and score of both players.
+func (g *Game) FullScore() (float64, float64, float64) {
 	checked := map[Cordinate]bool{}
 	score := 0.5 + float64(g.gameState.WhiteStones) - float64(g.gameState.WhiteStonesCaptured) - float64(g.gameState.BlackStones) + float64(g.gameState.BlackStonesCaptured)
+	white := float64(g.gameState.BlackStonesCaptured)
+	black := float64(g.gameState.WhiteStonesCaptured)
 	for y := range g.gameState.Board {
 		for x := range g.gameState.Board[y] {
 			if chk, ok := checked[Cordinate{x, y}]; g.gameState.Board[y][x] != nil || (ok && chk) {
@@ -310,15 +317,25 @@ func (g *Game) Score() float64 {
 			}
 			uniform, owner, size := g.asignTeritory(x, y, checked)
 			if uniform && owner != nil {
-				sign := 1
-				if !(*owner) {
+				sign := -1
+				if *owner {
+					white += float64(size)
+					sign = 1
+				} else {
+					black += float64(size)
 					sign = -1
 				}
 				score += float64(sign * size)
 			}
 		}
 	}
-	return score
+	return score, white, black
+}
+
+// Score returns game score.
+func (g *Game) Score() float64 {
+	gameScore, _, _ := g.FullScore()
+	return gameScore
 }
 
 // -------------------------------------- -------------- ------------------------------------- \\
@@ -357,6 +374,7 @@ func (g *Game) Update() error {
 		// save move
 		g.gameState.MovesCount++
 		g.gameState.Moves = append(g.gameState.Moves, [2]*int{x, y})
+
 		// consequitive skips end the game
 		if skip && g.gameState.OpponentSkipped {
 			g.active = false
@@ -364,6 +382,11 @@ func (g *Game) Update() error {
 		g.gameState.OpponentSkipped = false
 		if skip {
 			g.gameState.OpponentSkipped = true
+			if g.whiteToMove {
+				g.gameState.WhiteMoves += 1
+			} else {
+				g.gameState.BlackMoves += 1
+			}
 		}
 
 		// lock unlocks after next successful move
