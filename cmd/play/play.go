@@ -37,7 +37,7 @@ func main() {
 	black := flag.String("black", "human", "set to 'human' or to 'agent'")
 	populationFile := flag.String("population", "", "population file to use for agent players")
 	moveDelay := flag.Int("delay", 0, "miliseconds to wait after each move not made by human")
-	replay := flag.String("replay", "human", "game save file to replay")
+	replay := flag.String("replay", "", "game save file to replay")
 	flag.Parse()
 
 	var whitePlayer player.Player
@@ -55,19 +55,12 @@ func main() {
 	if isArgSet(populationFile) {
 		population.LoadFromFile(populationFile)
 
-		n := 0
 		if isArgSet(white) && *white == "agent" {
-			if agent := population.BestNPlayer(n); agent != nil {
-				whitePlayer = agent
-			}
-			n++
+			whitePlayer = population.FirstNthAgent(0)
 		}
 
 		if isArgSet(black) && *black == "agent" {
-			if agent := population.BestNPlayer(n); agent != nil {
-				blackPlayer = agent
-			}
-			n++
+			blackPlayer = population.FirstNthAgent(1)
 		}
 	}
 
