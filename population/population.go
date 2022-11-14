@@ -199,7 +199,7 @@ func (p *Population) playMatches(groupID int, enteties []*Entety, toKeep int, sa
 	s := time.Now().UnixMilli()
 	fmt.Printf("[group %d] starting group matches\n", groupID)
 	var best *float64
-	var bestGame *game.Game
+	var bestGame game.Game
 	gameName := ""
 	for idOne, entetyOne := range enteties {
 		for idTwo, entetyTwo := range enteties {
@@ -212,7 +212,7 @@ func (p *Population) playMatches(groupID int, enteties []*Entety, toKeep int, sa
 
 			if best == nil || *best > math.Abs(score) {
 				best = &score
-				bestGame = game
+				bestGame = *game
 				gameName = fmt.Sprintf("group_%d_%d_%d_%d.json", p.Age, groupID, idOne, idTwo)
 			}
 		}
@@ -226,6 +226,7 @@ func (p *Population) playMatches(groupID int, enteties []*Entety, toKeep int, sa
 		return enteties[i].Score >= enteties[j].Score
 	})
 	fmt.Printf("[group %d] best entety score %f\n", groupID, enteties[0].Score)
+	fmt.Printf("[group %d] worst entety score %f\n", groupID, enteties[len(enteties)-1].Score)
 	fmt.Printf("[group %d] finished group matches (miliseconds spent %d)\n", groupID, time.Now().UnixMilli()-s)
 	return enteties[:toKeep]
 }

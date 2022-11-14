@@ -63,6 +63,14 @@ func main() {
 	outputDirectory := flag.String("output", "", "path to output directory for training")
 	flag.Parse()
 
+	// create population
+	currPopulation := population.NewPopulation(config)
+	fmt.Println("...population created")
+	if isArgSet(populationFile) {
+		currPopulation.LoadFromFile(populationFile)
+		fmt.Println("...population overwritten from file")
+	}
+
 	// select output directory
 	if isArgSet(outputDirectory) {
 		config.OutputDirectory = *outputDirectory
@@ -74,13 +82,6 @@ func main() {
 	confirmDirectory(config.OutputDirectory)
 	fmt.Println("...output directory confirmed")
 
-	// create population
-	currPopulation := population.NewPopulation(config)
-	fmt.Println("...population created")
-	if isArgSet(populationFile) {
-		currPopulation.LoadFromFile(populationFile)
-		fmt.Println("...population overwritten from file")
-	}
 	currPopulation.CreateFiles(config.OutputDirectory)
 
 	// test save population
