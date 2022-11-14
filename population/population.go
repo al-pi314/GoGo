@@ -210,10 +210,11 @@ func (p *Population) playMatches(groupID int, enteties []*Entety, toKeep int, sa
 			entetyOne.Score += whiteScore
 			entetyTwo.Score += blackScore
 
-			if best == nil || *best > math.Abs(score) {
-				best = &score
+			abs_score := math.Abs(score)
+			if best == nil || *best > abs_score {
+				best = &abs_score
 				bestGame = *game
-				gameName = fmt.Sprintf("group_%d_%d_%d_%d.json", p.Age, groupID, idOne, idTwo)
+				gameName = fmt.Sprintf("group_%d_%d_%d_%d_%d.json", p.Age, groupID, idOne, idTwo, int(*best))
 			}
 		}
 	}
